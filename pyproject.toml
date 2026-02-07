@@ -1,0 +1,176 @@
+[project]
+name = "zex-transactions"
+version = "0.1.0"
+description = "ZEX transaction encoding, signing, and validation logic"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+
+dependencies = [
+    "coincurve~=20.0.0",
+    "eth-account>=0.13.7",
+    "eth-hash>=0.7.1",
+    "eth-utils>=5.3.1",
+    "frost-lib>=0.3.1",
+    "pydantic>=2.10.6",
+    "solders>=0.27.1",
+    "web3>=7.4.0",
+    "zexfrost",
+]
+
+[tool.uv.sources]
+zexfrost = { git = "https://github.com/zex-fi/zexfrost.git" }
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["zex*"]
+
+[dependency-groups]
+dev = [
+    "binance-connector>=3.12.0",
+    "click>=8.2.1",
+    "colorama>=0.4.6",
+    "commitizen>=4.4.1",
+    "deptry>=0.24.0",
+    "ipykernel>=6.29.5",
+    "line-profiler>=4.2.0",
+    "locust>=2.41.3",
+    "pyright>=1.1.394",
+    "pysocks>=1.7.1",
+    "pytest>=8.3.4",
+    "pytest-asyncio>=0.25.3",
+    "pytest-httpx>=0.35.0",
+    "pytest-mock>=3.15.1",
+    "pytest-repeat>=0.9.4",
+    "redislite>=6.2.912183",
+    "rich>=14.0.0",
+    "ruff>=0.9.4",
+    "termcolor>=3.1.0",
+    "tqdm>=4.67.1",
+]
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "v$version"
+version_scheme = "pep440"
+version_provider = "pep621"
+update_changelog_on_bump = true
+major_version_zero = true
+
+[tool.ruff]
+target-version = "py312"
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+    "app/proto",
+    "tests"
+]
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E", # pycodestyle errors
+    "F", # pyflakes errors
+    "W", # pycodestyle warnings
+    "C", # mccabe complexity checker
+    "B", # bugbear best practices checker
+    # "T20", # print and pprint # should add after print remove from codebase
+    "B", # flake8-bugbear best practices checker
+    "I", # isort
+]
+ignore = [
+    "B905", # zip-without-explicit-strict (https://docs.astral.sh/ruff/rules/zip-without-explicit-strict/)
+]
+
+
+# Allow fix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "F403"] # unused import
+"_init.py" = ["F401", "F403"]    # unused import
+
+[tool.ruff.lint.mccabe]
+max-complexity = 20 # TODO: we should reduce this since it will cause non-readable code
+
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.pyright]
+reportIncompatibleMethodOverride = "warning"
+reportUnusedVariable = "error"
+venv = ".venv"
+pythonVersion = "3.12"
+typeCheckingMode = "standard"
+extraPaths = [
+    ".",
+    "src"
+]
+exclude = [
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "build",
+    "dist",
+    "_*",
+    "app/proto/*",
+]
+
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "function"
+pythonpath = [".", "src"]
+filterwarnings = [
+    "ignore::DeprecationWarning:websockets.*",
+    "ignore::DeprecationWarning:web3.*",
+    "ignore::DeprecationWarning:websockets.legacy",
+    "ignore::DeprecationWarning:multiprocessing.popen_fork",
+    "ignore::UserWarning:redislite.*",
+]
+testpaths = ["tests"]
+log_cli = false
+
+[tool.deptry]
+per_rule_ignores = { DEP001 = ["zexfrost"], DEP002 = ["zexfrost"], DEP003 = ["zexfrost"], DEP004 = ["zexfrost"] }
+exclude = [
+    "app/benchmarks",
+    "scripts",
+    ".venv",
+    "venv",
+    "tests",
+]
+known_first_party = ["zex"]
+
+
+[tool.ruff.format]
+quote-style = "double"
+docstring-code-format = false
+docstring-code-line-length = 60

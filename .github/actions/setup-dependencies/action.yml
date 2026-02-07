@@ -1,0 +1,66 @@
+name: Setup Python and Install Dependencies
+description: Set up Python and install dependencies using uv
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version-file: .python-version
+
+    - name: Install system dependencies
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          pkg-config \
+          libsecp256k1-dev \
+          build-essential \
+          libgmp-dev \
+          automake \
+          clang \
+          cmake
+
+    - name: Cache mcl library
+      id: cache-mcl
+      uses: actions/cache@v4
+      with:
+        path: ~/mcl-cache
+        key: mcl-v2.14-${{ runner.os }}
+
+    - name: Restore mcl from cache
+      if: steps.cache-mcl.outputs.cache-hit == 'true'
+      shell: bash
+      run: |
+        sudo cp -r ~/mcl-cache/lib/* /usr/local/lib/
+        sudo cp -r ~/mcl-cache/include/* /usr/local/include/
+        sudo ldconfig
+
+    - name: Build and install mcl
+      if: steps.cache-mcl.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        git clone --depth 1 --branch v2.14 https://github.com/herumi/mcl.git
+        cd mcl
+        mkdir build
+        cd build
+        cmake -DCMAKE_CXX_COMPILER=clang++ ..
+        make -j$(nproc)
+        sudo make install
+        sudo ldconfig
+        cd ../..
+        rm -rf mcl
+        mkdir -p ~/mcl-cache/lib ~/mcl-cache/include
+        cp -r /usr/local/lib/libmcl* ~/mcl-cache/lib/
+        cp -r /usr/local/include/mcl ~/mcl-cache/include/
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+      with:
+        version: "0.9.13"
+        enable-cache: true
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        uv sync --frozen --refresh --no-editable

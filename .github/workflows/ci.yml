@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - dev
+  pull_request:
+    branches:
+      - dev
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  test:
+    runs-on: self-hosted
+    if: github.event.pull_request.draft == false || github.event_name == 'push'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python and Install Dependencies
+        uses: ./.github/actions/setup-dependencies
+
+      - name: Run linting
+        run: uv run ruff check
+
+      - name: Run dependency check
+        run: uv run deptry .
+
+      - name: Run formatting check
+        run: uv run ruff format --check .
+
+      - name: Run type checker
+        run: uv run pyright
+
+      - name: Run tests
+        run: uv run pytest
+
+      - name: Run benchmark
+        run: uv run python -m benchmarks.perf_send_100k
