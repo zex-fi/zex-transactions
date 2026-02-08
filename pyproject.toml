@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "ZEX transaction encoding, signing, and validation logic"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
+license = "CC0-1.0"
 
 dependencies = [
     "coincurve~=20.0.0",
