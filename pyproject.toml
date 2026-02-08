@@ -11,15 +11,12 @@ dependencies = [
     "eth-account>=0.13.7",
     "eth-hash>=0.7.1",
     "eth-utils>=5.3.1",
-    "frost-lib>=0.3.1",
     "pydantic>=2.10.6",
     "solders>=0.27.1",
     "web3>=7.4.0",
-    "zexfrost",
+    # "frost-lib @ git+https://github.com/sadeghte/frost-lib",
+    "zexfrost @ git+https://github.com/zex-fi/zexfrost.git",
 ]
-
-[tool.uv.sources]
-zexfrost = { git = "https://github.com/zex-fi/zexfrost.git" }
 
 [tool.setuptools]
 package-dir = { "" = "src" }
