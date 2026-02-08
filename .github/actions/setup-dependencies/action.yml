@@ -20,7 +20,8 @@ runs:
           build-essential \
           libgmp-dev \
           cmake \
-          clang
+          clang \
+          python3-dev
 
     - name: Cache mcl library
       id: cache-mcl
