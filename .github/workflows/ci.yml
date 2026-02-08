@@ -38,8 +38,6 @@ jobs:
       - name: Run tests
         run: uv run pytest
 
-      - name: Run benchmark
-        run: uv run python -m benchmarks.perf_send_100k
   release:
     runs-on: self-hosted
     needs: test
