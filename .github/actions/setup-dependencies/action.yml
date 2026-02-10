@@ -3,10 +3,12 @@ description: Set up Python and install dependencies using uv
 runs:
   using: "composite"
   steps:
-    - name: Set up Python
-      uses: actions/setup-python@v5
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
       with:
-        python-version-file: .python-version
+        version: "0.9.13"
+        enable-cache: true
+        python-version: "3.12" 
 
     - name: Install system dependencies
       shell: bash
@@ -17,9 +19,9 @@ runs:
           libsecp256k1-dev \
           build-essential \
           libgmp-dev \
-          automake \
+          cmake \
           clang \
-          cmake
+          python3-dev
 
     - name: Cache mcl library
       id: cache-mcl
@@ -42,23 +44,16 @@ runs:
       run: |
         git clone --depth 1 --branch v2.14 https://github.com/herumi/mcl.git
         cd mcl
-        mkdir build
-        cd build
+        mkdir build && cd build
         cmake -DCMAKE_CXX_COMPILER=clang++ ..
         make -j$(nproc)
         sudo make install
         sudo ldconfig
         cd ../..
-        rm -rf mcl
         mkdir -p ~/mcl-cache/lib ~/mcl-cache/include
         cp -r /usr/local/lib/libmcl* ~/mcl-cache/lib/
         cp -r /usr/local/include/mcl ~/mcl-cache/include/
-
-    - name: Install uv
-      uses: astral-sh/setup-uv@v5
-      with:
-        version: "0.9.13"
-        enable-cache: true
+        rm -rf mcl
 
     - name: Install dependencies
       shell: bash

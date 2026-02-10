@@ -147,21 +147,12 @@ class BaseMessage(ABC):
             signature = ecdsa.cdata_to_der(
                 ecdsa.deserialize_compact(bytes.fromhex(self.signature_hex))
             )
-
-            try:
-                message_hash = keccak(self.create_message())
-            except MessageFormatError:
-                return False
+            message_hash = keccak(self.create_message())
             return public_key_secp256k1.verify(signature, message_hash, hasher=None)
         elif self.signature_type == SignatureType.ED25519:
             public_key_ed25519 = Pubkey.from_bytes(public_key_bytes)
             signature = Signature.from_bytes(bytes.fromhex(self.signature_hex))
-
-            try:
-                msg = self.create_message()
-            except MessageFormatError:
-                return False
-
+            msg = self.create_message()
             return signature.verify(public_key_ed25519, msg)
         else:
             raise ValueError("The signature type of this message is not valid.")

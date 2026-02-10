@@ -4,21 +4,18 @@ version = "0.1.0"
 description = "ZEX transaction encoding, signing, and validation logic"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
+license = "CC0-1.0"
 
 dependencies = [
     "coincurve~=20.0.0",
     "eth-account>=0.13.7",
     "eth-hash>=0.7.1",
     "eth-utils>=5.3.1",
-    "frost-lib>=0.3.1",
     "pydantic>=2.10.6",
     "solders>=0.27.1",
     "web3>=7.4.0",
-    "zexfrost",
+    "zexfrost @ git+https://github.com/zex-fi/zexfrost.git",
 ]
-
-[tool.uv.sources]
-zexfrost = { git = "https://github.com/zex-fi/zexfrost.git" }
 
 [tool.setuptools]
 package-dir = { "" = "src" }
@@ -26,6 +23,7 @@ package-dir = { "" = "src" }
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["zex*"]
+exclude = ["tests*"]
 
 [dependency-groups]
 dev = [
