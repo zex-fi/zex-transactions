@@ -24,6 +24,7 @@ package-dir = { "" = "src" }
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["zex*"]
+exclude = ["tests*"]
 
 [dependency-groups]
 dev = [
