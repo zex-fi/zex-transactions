@@ -14,7 +14,6 @@ dependencies = [
     "pydantic>=2.10.6",
     "solders>=0.27.1",
     "web3>=7.4.0",
-    "frost-lib>=0.3.1",
     "zexfrost @ git+https://github.com/zex-fi/zexfrost.git",
 ]
 

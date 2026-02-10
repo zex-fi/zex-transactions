@@ -7,10 +7,9 @@ from typing import Any
 from coincurve import PrivateKey
 from eth_account import Account
 from eth_account.messages import encode_defunct
-from frost_lib.curves import secp256k1
-from frost_lib.curves import secp256k1 as curve
 from pydantic import BaseModel
 from web3 import Web3
+from zexfrost.utils import get_curve
 
 from zex.transactions.base_message import BaseMessage
 from zex.transactions.exceptions import (
@@ -20,6 +19,8 @@ from zex.transactions.exceptions import (
 from zex.transactions.zex_types import ChainName, TransactionType
 
 w3 = Web3()
+
+curve = get_curve(curve="secp256k1")
 
 
 class Deposit(BaseModel):
@@ -274,7 +275,9 @@ class DepositMessage(BaseMessage):
         assert self.frost_signature is not None
         assert self.ecdsa_signature is not None
         try:
-            frost_verified = secp256k1.single_verify(
+            # TODO Calling single verify instead of verify group signature should
+            # be validated to be correct in this case.
+            frost_verified = curve.single_verify(
                 self.frost_signature.hex(),
                 message,
                 deposit_frost_public_key,
