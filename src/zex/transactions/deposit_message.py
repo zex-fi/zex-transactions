@@ -268,31 +268,26 @@ class DepositMessage(BaseMessage):
         deposit_frost_public_key: str,
         deposit_shield_address: str,
     ) -> bool:
-        # TODO Receive deposit shield address and frost public key as arguments.
         assert self._transaction_bytes is not None
         message = self._transaction_bytes[: -DepositMessage.SIGNATURE_LENGTH]
+
         # Verify FROST signature
         assert self.frost_signature is not None
         assert self.ecdsa_signature is not None
-        try:
-            # TODO Calling single verify instead of verify group signature should
-            # be validated to be correct in this case.
-            frost_verified = curve.single_verify(
-                self.frost_signature.hex(),
-                message,
-                deposit_frost_public_key,
-            )
-        except ValueError:
-            return False
+        frost_verified = curve.single_verify(
+            self.frost_signature.hex(),
+            message,
+            deposit_frost_public_key,
+        )
 
-        try:
-            eth_signed_message = encode_defunct(message)
-            recovered_address = w3.eth.account.recover_message(
-                eth_signed_message, signature=self.ecdsa_signature
-            )
-            ecdsa_verified = recovered_address == deposit_shield_address
-        except ValueError:
-            return False
+        # Verify ECDSA signature
+        eth_signed_message = encode_defunct(message)
+        recovered_address = w3.eth.account.recover_message(
+            eth_signed_message, signature=self.ecdsa_signature
+        )
+        deposit_shield_address = deposit_shield_address
+        ecdsa_verified = recovered_address == deposit_shield_address
+
         return frost_verified and ecdsa_verified
 
     def _get_message_arguments(self) -> list[Any]:
