@@ -16,7 +16,7 @@ from zex.transactions.exceptions import (
     HeaderFormatError,
     UnexpectedCommandError,
 )
-from zex.transactions.zex_types import ChainName, TransactionType
+from zex.utils.zex_types import ChainName, TransactionType
 
 w3 = Web3()
 

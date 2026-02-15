@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 from zex.transactions.order_message import OrderMessage
 from zex.transactions.utils import to_scientific
-from zex.transactions.zex_types import TransactionType
+from zex.utils.zex_types import TransactionType
 
 
 class BuyMessage(OrderMessage):

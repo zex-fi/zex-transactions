@@ -1,5 +1,5 @@
 from zex.transactions import DepositMessage, Deposit
-from zex.transactions.zex_types import ChainName
+from zex.utils.zex_types import ChainName
 from coincurve import PrivateKey
 from frost_lib.curves import secp256k1 as curve
 from eth_account import Account

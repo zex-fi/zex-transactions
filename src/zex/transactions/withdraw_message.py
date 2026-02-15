@@ -13,7 +13,7 @@ from zex.transactions.exceptions import (
     UnexpectedCommandError,
 )
 from zex.transactions.utils import format_decimal, to_scientific
-from zex.transactions.zex_types import ChainName, SignatureType, TransactionType
+from zex.utils.zex_types import ChainName, SignatureType, TransactionType
 
 
 class WithdrawMessage(BaseMessage):

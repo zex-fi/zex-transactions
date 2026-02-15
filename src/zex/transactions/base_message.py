@@ -11,7 +11,7 @@ from solders.pubkey import Pubkey
 from solders.signature import Signature
 
 from zex.transactions.exceptions import MessageFormatError, MessageValidationError
-from zex.transactions.zex_types import SignatureType, TransactionType
+from zex.utils.zex_types import SignatureType, TransactionType
 
 
 class BaseMessage(ABC):
