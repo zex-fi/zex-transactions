@@ -9,8 +9,8 @@ from zex.transactions.exceptions import (
     MessageValidationError,
     UnexpectedCommandError,
 )
-from zex.transactions.utils import format_decimal
-from zex.transactions.zex_types import SignatureType, TransactionType
+from zex.utils.numbers import format_decimal
+from zex.utils.zex_types import SignatureType, TransactionType
 
 
 class OrderMessage(BaseMessage):

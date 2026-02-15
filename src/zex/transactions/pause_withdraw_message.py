@@ -9,7 +9,7 @@ from zex.transactions.exceptions import (
     MessageFormatError,
     UnexpectedCommandError,
 )
-from zex.transactions.zex_types import SignatureType, TransactionType
+from zex.utils.zex_types import SignatureType, TransactionType
 
 
 class PauseWithdrawMessage(BaseMessage):
