@@ -12,7 +12,7 @@ from zex.transactions.exceptions import (
     MessageValidationError,
     UnexpectedCommandError,
 )
-from zex.transactions.utils import format_decimal, to_scientific
+from zex.utils.numbers import format_decimal, to_scientific
 from zex.utils.zex_types import ChainName, SignatureType, TransactionType
 
 

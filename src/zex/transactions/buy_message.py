@@ -3,7 +3,7 @@ from decimal import Decimal
 from pydantic import BaseModel
 
 from zex.transactions.order_message import OrderMessage
-from zex.transactions.utils import to_scientific
+from zex.utils.numbers import to_scientific
 from zex.utils.zex_types import TransactionType
 
 
