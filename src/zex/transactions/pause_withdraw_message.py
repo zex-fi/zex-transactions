@@ -22,6 +22,7 @@ class PauseWithdrawMessage(BaseMessage):
         signature_type_value: int,
         is_set: bool,
         time: int,
+        nonce: int,
         signature_hex: str | None = None,
     ) -> None:
         self.signature_type = SignatureType.from_int(signature_type_value)
@@ -30,6 +31,7 @@ class PauseWithdrawMessage(BaseMessage):
         self.version = version
         self.time = time
         self.is_set = is_set
+        self.nonce = nonce
 
         self._transaction_bytes: bytes | None = None
 
@@ -39,7 +41,7 @@ class PauseWithdrawMessage(BaseMessage):
 
     @classmethod
     def get_body_format(cls) -> str:
-        return f">BI {cls.SIGNATURE_LENGTH}"
+        return f">BII {cls.SIGNATURE_LENGTH}"
 
     @classmethod
     def get_format(cls) -> str:
@@ -65,7 +67,7 @@ class PauseWithdrawMessage(BaseMessage):
         body_bytes = transaction_bytes[cls.HEADER_LENGTH : cls.HEADER_LENGTH + body_size]
 
         try:
-            is_set, time, signature_bytes = unpack(body_format, body_bytes)
+            is_set, time, nonce, signature_bytes = unpack(body_format, body_bytes)
         except struct_error as e:
             raise MessageFormatError(f"Failed to unpack body: {e}") from e
         if is_set not in (0, 1):
@@ -76,13 +78,20 @@ class PauseWithdrawMessage(BaseMessage):
             signature_type_value=signature_type,
             is_set=bool(is_set),
             time=time,
+            nonce=nonce,
             signature_hex=signature_bytes.hex(),
         )
         pause_withdraw_message._transaction_bytes = transaction_bytes
         return pause_withdraw_message
 
     def __str__(self) -> str:
-        return f"v: {self.version}\nname: pause withdraw\nis set: {self.is_set}t: {self.time}"
+        return (
+            f"v: {self.version}\n"
+            "name: pause withdraw\n"
+            f"is set: {self.is_set}\n"
+            f"t: {self.time}\n"
+            f"nonce: {self.nonce}\n"
+        )
 
     def to_bytes(self) -> bytes:
         if self._transaction_bytes is not None:
@@ -96,6 +105,7 @@ class PauseWithdrawMessage(BaseMessage):
             self.signature_type.value,
             self.is_set,
             self.time,
+            self.nonce,
             bytes.fromhex(self.signature_hex),
         )
         self._transaction_bytes = transaction_bytes
