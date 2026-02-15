@@ -23,6 +23,7 @@ class PauseWithdrawMessage(BaseMessage):
         is_set: bool,
         time: int,
         nonce: int,
+        user_id: int,
         signature_hex: str | None = None,
     ) -> None:
         self.signature_type = SignatureType.from_int(signature_type_value)
@@ -32,6 +33,7 @@ class PauseWithdrawMessage(BaseMessage):
         self.time = time
         self.is_set = is_set
         self.nonce = nonce
+        self.user_id = user_id
 
         self._transaction_bytes: bytes | None = None
 
@@ -41,7 +43,7 @@ class PauseWithdrawMessage(BaseMessage):
 
     @classmethod
     def get_body_format(cls) -> str:
-        return f">BII {cls.SIGNATURE_LENGTH}"
+        return f">BIIQ {cls.SIGNATURE_LENGTH}"
 
     @classmethod
     def get_format(cls) -> str:
@@ -67,7 +69,7 @@ class PauseWithdrawMessage(BaseMessage):
         body_bytes = transaction_bytes[cls.HEADER_LENGTH : cls.HEADER_LENGTH + body_size]
 
         try:
-            is_set, time, nonce, signature_bytes = unpack(body_format, body_bytes)
+            is_set, time, nonce, user_id, signature_bytes = unpack(body_format, body_bytes)
         except struct_error as e:
             raise MessageFormatError(f"Failed to unpack body: {e}") from e
         if is_set not in (0, 1):
@@ -79,6 +81,7 @@ class PauseWithdrawMessage(BaseMessage):
             is_set=bool(is_set),
             time=time,
             nonce=nonce,
+            user_id=user_id,
             signature_hex=signature_bytes.hex(),
         )
         pause_withdraw_message._transaction_bytes = transaction_bytes
@@ -91,6 +94,7 @@ class PauseWithdrawMessage(BaseMessage):
             f"is set: {self.is_set}\n"
             f"t: {self.time}\n"
             f"nonce: {self.nonce}\n"
+            f"user_id: {self.user_id}\n"
         )
 
     def to_bytes(self) -> bytes:
@@ -106,6 +110,7 @@ class PauseWithdrawMessage(BaseMessage):
             self.is_set,
             self.time,
             self.nonce,
+            self.user_id,
             bytes.fromhex(self.signature_hex),
         )
         self._transaction_bytes = transaction_bytes
