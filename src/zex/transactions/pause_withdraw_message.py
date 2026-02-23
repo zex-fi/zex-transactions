@@ -43,7 +43,7 @@ class PauseWithdrawMessage(BaseMessage):
 
     @classmethod
     def get_body_format(cls) -> str:
-        return f">BIIQ {cls.SIGNATURE_LENGTH}"
+        return f">BIIQ {cls.SIGNATURE_LENGTH}s"
 
     @classmethod
     def get_format(cls) -> str:
