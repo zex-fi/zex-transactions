@@ -7,6 +7,7 @@ from typing import Any, ClassVar
 
 from coincurve import PrivateKey, PublicKey, ecdsa
 from eth_hash.auto import keccak
+from solders.keypair import Keypair
 from solders.pubkey import Pubkey
 from solders.signature import Signature
 
@@ -118,14 +119,18 @@ class BaseMessage(ABC):
             raise ValueError("The message type is invalid.")
         return message.encode("ascii")
 
-    def sign(self, private_key: PrivateKey, *args, **kwargs) -> bytes:
+    def sign(self, private_key: PrivateKey | Keypair, *args, **kwargs) -> bytes:
         if self.signature_type == SignatureType.SECP256K1:
+            assert isinstance(private_key, PrivateKey)
             signature = private_key.sign_recoverable(keccak(self.create_message()), hasher=None)
             signature = signature[:64]  # Compact format
             self.signature_hex = signature.hex()
             return signature
         elif self.signature_type == SignatureType.ED25519:
-            raise NotImplementedError()
+            assert isinstance(private_key, Keypair)
+            signature = private_key.sign_message(self.create_message())
+            self.signature_hex = bytes(signature).hex()
+            return bytes(signature)
         else:
             raise ValueError("The signature type of this message is not valid.")
 

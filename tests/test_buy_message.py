@@ -1,3 +1,5 @@
+from solders.keypair import Keypair
+
 from zex.transactions import BuyMessage
 
 
@@ -35,3 +37,24 @@ def test_given_output_of_to_bytes_when_calling_from_bytes_then_construct_the_sam
     assert new_buy_message.signature_hex == original_buy_message.signature_hex
     assert new_buy_message.nonce == original_buy_message.nonce
     assert new_buy_message.user_id == original_buy_message.user_id
+
+
+def test_ed25519_sign_and_verify(ed25519_keypair: Keypair) -> None:
+    msg = BuyMessage(
+        version=1,
+        signature_type_value=2,
+        base_token="BTC",
+        quote_token="USDT",
+        amount_mantissa=1,
+        amount_exponent=1,
+        price_mantissa=1,
+        price_exponent=5,
+        time=10000,
+        nonce=1,
+        user_id=1,
+        signature_hex=None,
+    )
+
+    msg.sign(ed25519_keypair)
+
+    assert msg.verify_signature(bytes(ed25519_keypair.pubkey()))

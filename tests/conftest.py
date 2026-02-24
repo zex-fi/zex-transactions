@@ -1,5 +1,6 @@
 import pytest
 from coincurve import PrivateKey, PublicKey
+from solders.keypair import Keypair
 
 
 @pytest.fixture
@@ -15,6 +16,11 @@ def private_key() -> PrivateKey:
 @pytest.fixture
 def public_key(private_key: PrivateKey) -> PublicKey:
     return private_key.public_key
+
+
+@pytest.fixture
+def ed25519_keypair() -> Keypair:
+    return Keypair()
 
 
 @pytest.fixture
