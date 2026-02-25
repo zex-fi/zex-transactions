@@ -268,8 +268,8 @@ class DepositMessage(BaseMessage):
         deposit_frost_public_key: str,
         deposit_shield_address: str,
     ) -> bool:
-        assert self._transaction_bytes is not None
-        message = self._transaction_bytes[: -DepositMessage.SIGNATURE_LENGTH]
+        transaction_bytes = self._transaction_bytes or self.to_bytes()
+        message = transaction_bytes[: -DepositMessage.SIGNATURE_LENGTH]
 
         # Verify FROST signature
         assert self.frost_signature is not None
