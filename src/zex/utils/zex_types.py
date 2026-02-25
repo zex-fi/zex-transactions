@@ -11,7 +11,7 @@ type TradeId = int
 type DepositId = int
 type WithdrawId = int
 
-type OrderNonce = int
+type Nonce = int
 
 # type ChainName = str
 type CurveName = str
