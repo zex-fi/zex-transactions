@@ -1,6 +1,7 @@
 from solders.keypair import Keypair
 
 from zex.transactions import BuyMessage
+from zex.utils.zex_types import SignatureType
 
 
 def test_given_output_of_to_bytes_when_calling_from_bytes_then_construct_the_same_attributes(
@@ -9,7 +10,7 @@ def test_given_output_of_to_bytes_when_calling_from_bytes_then_construct_the_sam
     # Given
     original_buy_message = BuyMessage(
         version=1,
-        signature_type_value=1,
+        signature_type=SignatureType.SECP256K1,
         base_token="BTC",
         quote_token="USDT",
         amount_mantissa=1,
@@ -42,7 +43,7 @@ def test_given_output_of_to_bytes_when_calling_from_bytes_then_construct_the_sam
 def test_ed25519_sign_and_verify(ed25519_keypair: Keypair) -> None:
     msg = BuyMessage(
         version=1,
-        signature_type_value=2,
+        signature_type=SignatureType.ED25519,
         base_token="BTC",
         quote_token="USDT",
         amount_mantissa=1,

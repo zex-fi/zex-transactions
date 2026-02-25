@@ -1,5 +1,5 @@
 from zex.transactions import WithdrawMessage
-from zex.utils.zex_types import ChainName
+from zex.utils.zex_types import ChainName, SignatureType
 
 
 def test_given_output_of_to_bytes_when_calling_from_bytes_then_construct_the_same_attributes(
@@ -8,7 +8,7 @@ def test_given_output_of_to_bytes_when_calling_from_bytes_then_construct_the_sam
     # Given
     original_withdraw_message = WithdrawMessage(
         version=1,
-        signature_type_value=1,
+        signature_type=SignatureType.SECP256K1,
         token_name="BTC",
         chain_name=ChainName.Bitcoin,
         amount_mantissa=1,

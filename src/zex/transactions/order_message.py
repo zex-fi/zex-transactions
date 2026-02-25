@@ -19,7 +19,7 @@ class OrderMessage(BaseMessage):
     def __init__(
         self,
         version: int,
-        signature_type_value: int,
+        signature_type: SignatureType,
         base_token: str,
         quote_token: str,
         amount_mantissa: int,
@@ -32,7 +32,7 @@ class OrderMessage(BaseMessage):
         signature_hex: str | None = None,
     ) -> None:
         self.version = version
-        self.signature_type = SignatureType.from_int(signature_type_value)
+        self.signature_type = signature_type
         self.validate_signature(signature_hex)
         self.signature_hex = signature_hex
 
@@ -125,7 +125,7 @@ class OrderMessage(BaseMessage):
 
         order_message = cls(
             version=version,
-            signature_type_value=signature_type,
+            signature_type=SignatureType.from_int(signature_type),
             base_token=base_token,
             quote_token=quote_token,
             amount_mantissa=amount_mantissa,

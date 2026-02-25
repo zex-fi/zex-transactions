@@ -23,7 +23,7 @@ class WithdrawMessage(BaseMessage):
     def __init__(
         self,
         version: int,
-        signature_type_value: int,
+        signature_type: SignatureType,
         token_name: str,
         chain_name: ChainName,
         amount_mantissa: int,
@@ -35,7 +35,7 @@ class WithdrawMessage(BaseMessage):
         signature_hex: str | None = None,
     ) -> None:
         self.destination_wallet = destination_wallet
-        self.signature_type = SignatureType.from_int(signature_type_value)
+        self.signature_type = signature_type
         self.validate_signature(signature_hex)
         self.signature_hex = signature_hex
 
@@ -114,7 +114,7 @@ class WithdrawMessage(BaseMessage):
 
         withdraw_message = cls(
             version=version,
-            signature_type_value=signature_type,
+            signature_type=SignatureType.from_int(signature_type),
             token_name=token_name,
             chain_name=chain_name,
             amount_mantissa=amount_mantissa,
@@ -191,7 +191,7 @@ class WithdrawMessage(BaseMessage):
 
 
 class WithdrawSchema(BaseModel):
-    sig_type: int
+    sig_type: SignatureType
     token_chain: str
     token_name: str
     amount: str
@@ -210,7 +210,7 @@ class WithdrawSchema(BaseModel):
 
         return WithdrawMessage(
             version=1,
-            signature_type_value=self.sig_type,
+            signature_type=self.sig_type,
             token_name=self.token_name,
             chain_name=chain,
             amount_mantissa=mantissa,

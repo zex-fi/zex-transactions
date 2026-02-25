@@ -19,14 +19,14 @@ class PauseWithdrawMessage(BaseMessage):
     def __init__(
         self,
         version: int,
-        signature_type_value: int,
+        signature_type: SignatureType,
         is_set: bool,
         time: int,
         nonce: int,
         user_id: int,
         signature_hex: str | None = None,
     ) -> None:
-        self.signature_type = SignatureType.from_int(signature_type_value)
+        self.signature_type = signature_type
         self.validate_signature(signature_hex)
         self.signature_hex = signature_hex
         self.version = version
@@ -77,7 +77,7 @@ class PauseWithdrawMessage(BaseMessage):
 
         pause_withdraw_message = cls(
             version=version,
-            signature_type_value=signature_type,
+            signature_type=SignatureType.from_int(signature_type),
             is_set=bool(is_set),
             time=time,
             nonce=nonce,

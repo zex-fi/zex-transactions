@@ -1,4 +1,5 @@
 from zex.transactions import TransferMessage
+from zex.utils.zex_types import SignatureType
 
 
 def test_given_output_of_to_bytes_when_calling_from_bytes_then_construct_the_same_attributes(
@@ -7,7 +8,7 @@ def test_given_output_of_to_bytes_when_calling_from_bytes_then_construct_the_sam
     # Given
     original_transfer_message = TransferMessage(
         version=1,
-        signature_type_value=1,
+        signature_type=SignatureType.SECP256K1,
         token_name="BTC",
         amount_mantissa=1,
         amount_exponent=1,

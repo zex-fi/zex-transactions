@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 from zex.transactions.order_message import OrderMessage
 from zex.utils.numbers import to_scientific
-from zex.utils.zex_types import TransactionType
+from zex.utils.zex_types import SignatureType, TransactionType
 
 
 class SellMessage(OrderMessage):
@@ -12,7 +12,7 @@ class SellMessage(OrderMessage):
 
 
 class SellSchema(BaseModel):
-    sig_type: int
+    sig_type: SignatureType
     base_token: str
     quote_token: str
     amount: str
@@ -27,7 +27,7 @@ class SellSchema(BaseModel):
         price_mantissa, price_exponent = to_scientific(Decimal(self.price))
         return SellMessage(
             version=1,
-            signature_type_value=self.sig_type,
+            signature_type=self.sig_type,
             base_token=self.base_token,
             quote_token=self.quote_token,
             amount_mantissa=amount_mantissa,
