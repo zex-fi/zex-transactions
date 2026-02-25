@@ -55,11 +55,10 @@ class SignatureType(Enum):
 
     @classmethod
     def from_string(cls, value: str) -> "SignatureType":
-        value_upper = value.upper()
-        for member in cls:
-            if member.name == value_upper:
-                return member
-        raise ValueError(f"'{value}' is not a valid SignatureType.")
+        try:
+            return cls[value.upper()]
+        except KeyError as e:
+            raise ValueError(f"'{value}' is not a valid SignatureType.") from e
 
 
 class ExecutionType(Enum):
