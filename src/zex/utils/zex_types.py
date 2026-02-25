@@ -13,7 +13,6 @@ type WithdrawId = int
 
 type OrderNonce = int
 
-# type ChainName = str
 type CurveName = str
 type TokenName = str
 type MarketName = str
