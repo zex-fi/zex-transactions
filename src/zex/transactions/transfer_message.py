@@ -1,3 +1,4 @@
+import itertools
 from decimal import Decimal
 from enum import Enum
 from struct import calcsize, pack, unpack
@@ -35,8 +36,17 @@ class Recipient:
     def amount_str(self) -> str:
         return format_decimal(Decimal(self.amount_mantissa) * 10 ** Decimal(self.amount_exponent))
 
-    def __str__(self) -> str:
-        return f"recipient_id: {self.recipient_id}, amount: {self.amount_str}"
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Recipient):
+            return NotImplemented
+        return (
+            self.recipient_id == other.recipient_id
+            and self.amount_mantissa == other.amount_mantissa
+            and self.amount_exponent == other.amount_exponent
+        )
+
+    def __repr__(self) -> str:
+        return f"(recipient_id: {self.recipient_id}, amount: {self.amount_str})"
 
 
 class TransferStatus(Enum):
@@ -55,13 +65,10 @@ class TransferSchema(BaseModel):
     signature: str
 
     def to_message(self) -> "TransferMessage":
-        # preallocate memory
-        recipients: list[Recipient] = [None] * len(self.recipients)  # pyright: ignore[reportAssignmentType]
-
-        for i, (recipient_id, amount) in enumerate(self.recipients):
-            mantissa, exponent = to_scientific(Decimal(amount))
-            recipients[i] = Recipient(recipient_id, mantissa, exponent)
-
+        recipients = [
+            Recipient(recipient_id, *to_scientific(Decimal(amount)))
+            for recipient_id, amount in self.recipients
+        ]
         return TransferMessage(
             version=1,
             signature_type_value=self.sig_type,
@@ -104,9 +111,9 @@ class TransferMessage(BaseMessage):
         self.status = TransferStatus.NEW
 
         min_exponent = -TransferMessage.ADDITIONAL_EXPONENT
-        if any(r.amount_exponent < min_exponent for r in self.recipients):
+        if any(recipient.amount_exponent < min_exponent for recipient in self.recipients):
             raise MessageValidationError(
-                f"amount_exponent is too small for one the recipients (minimum: {min_exponent})"
+                f"amount_exponent is too small for one of the recipients (minimum: {min_exponent})"
             )
 
     @classmethod
@@ -138,22 +145,25 @@ class TransferMessage(BaseMessage):
 
         try:
             unpacked_data = unpack(body_format, body_bytes)
-            data_iter = iter(unpacked_data)
 
-            token_name_bytes = next(data_iter)
+            token_name_bytes = unpacked_data[0]
 
-            # preallocate memory
-            recipients: list[Recipient] = [None] * recipients_count  # pyright: ignore[reportAssignmentType]
+            # Extract recipients using a step-based slice
+            # Each recipient takes 3 slots. We start at index 1 and end at 1 + (count * 3)
+            start_idx = 1
+            end_idx = start_idx + (recipients_count * 3)
+            recipient_slice = unpacked_data[start_idx:end_idx]
 
-            for i in range(recipients_count):
-                mantissa = next(data_iter)
-                exponent = next(data_iter)
-                recipient_id = next(data_iter)
-                recipients[i] = Recipient(recipient_id, mantissa, exponent)
-            time = next(data_iter)
-            nonce = next(data_iter)
-            user_id = next(data_iter)
-            signature_bytes = next(data_iter)
+            # split the recipients data into 3-value chunks
+            # ref: https://will-keleher.com/posts/chunking-in-python.html
+            recipients = [
+                Recipient(recipient_id, mantissa, exponent)
+                for mantissa, exponent, recipient_id in zip(*[iter(recipient_slice)] * 3)
+            ]
+
+            # Extract trailing elements using negative indexing or a final offset
+            time, nonce, user_id, signature_bytes = unpacked_data[end_idx : end_idx + 4]
+
         except (struct_error, StopIteration) as e:
             raise MessageFormatError(f"Failed to unpack body: {e}") from e
 
@@ -204,9 +214,9 @@ class TransferMessage(BaseMessage):
         assert self.signature_hex is not None
 
         # Interleave recipient data: [m1, e1, id1, m2, e2, id2...]
-        recipients_data = []
-        for r in self.recipients:
-            recipients_data.extend([r.amount_mantissa, r.amount_exponent, r.recipient_id])
+        recipients_data = itertools.chain.from_iterable(
+            (r.amount_mantissa, r.amount_exponent, r.recipient_id) for r in self.recipients
+        )
 
         transaction_bytes = pack(
             TransferMessage.get_format(

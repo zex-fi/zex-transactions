@@ -15,7 +15,9 @@ from .register_message import RegisterMessage as RegisterMessage
 from .register_message import RegisterSchema as RegisterSchema
 from .sell_message import SellMessage as SellMessage
 from .sell_message import SellSchema as SellSchema
+from .transfer_message import Recipient as Recipient
 from .transfer_message import TransferMessage as TransferMessage
 from .transfer_message import TransferSchema as TransferSchema
+from .transfer_message import TransferStatus as TransferStatus
 from .withdraw_message import WithdrawMessage as WithdrawMessage
 from .withdraw_message import WithdrawSchema as WithdrawSchema
