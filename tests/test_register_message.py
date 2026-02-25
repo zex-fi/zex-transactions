@@ -1,4 +1,5 @@
 from zex.transactions import RegisterMessage
+from zex.utils.zex_types import SignatureType
 
 
 def test_given_output_of_to_bytes_when_calling_from_bytes_then_construct_the_same_attributes(
@@ -7,7 +8,7 @@ def test_given_output_of_to_bytes_when_calling_from_bytes_then_construct_the_sam
     # Given
     original_register_message = RegisterMessage(
         version=1,
-        signature_type_value=1,
+        signature_type=SignatureType.SECP256K1,
         referral_code="1",
         public_key=dummy_public_key_secp256k1,
         signature_hex=dummy_signature_hex,

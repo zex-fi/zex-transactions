@@ -13,7 +13,7 @@ from zex.utils.zex_types import SignatureType, TransactionType
 
 
 class RegisterSchema(BaseModel):
-    sig_type: int
+    sig_type: SignatureType
     referral_code: str
     public_key: bytes
     signature: str
@@ -21,7 +21,7 @@ class RegisterSchema(BaseModel):
     def to_message(self) -> "RegisterMessage":
         return RegisterMessage(
             version=1,
-            signature_type_value=self.sig_type,
+            signature_type=self.sig_type,
             referral_code=self.referral_code,
             public_key=self.public_key,
             signature_hex=self.signature,
@@ -35,7 +35,7 @@ class RegisterMessage(BaseMessage):
     def __init__(
         self,
         version: int,
-        signature_type_value: int,
+        signature_type: SignatureType,
         referral_code: str,
         public_key: bytes,
         signature_hex: str | None = None,
@@ -44,7 +44,7 @@ class RegisterMessage(BaseMessage):
 
         self.referral_code = referral_code
         self.public_key = public_key
-        self.signature_type = SignatureType.from_int(signature_type_value)
+        self.signature_type = signature_type
         self.version = version
         self.validate_signature(signature_hex)
         self.signature_hex = signature_hex
@@ -66,9 +66,10 @@ class RegisterMessage(BaseMessage):
         if command != cls.TRANSACTION_TYPE.value:
             raise UnexpectedCommandError("Unexpected command.")
 
-        if signature_type == SignatureType.SECP256K1.value:
+        sig_type = SignatureType.from_int(signature_type)
+        if sig_type == SignatureType.SECP256K1:
             public_key_length = 33
-        elif signature_type == SignatureType.ED25519.value:
+        elif sig_type == SignatureType.ED25519:
             public_key_length = 32
         else:
             raise ValueError("Unknown signature type.")
@@ -89,7 +90,7 @@ class RegisterMessage(BaseMessage):
 
         register_message = cls(
             version=version,
-            signature_type_value=signature_type,
+            signature_type=sig_type,
             referral_code=referral_code.decode("ascii"),
             public_key=public_key,
             signature_hex=signature_bytes.hex(),

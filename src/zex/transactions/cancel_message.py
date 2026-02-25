@@ -13,7 +13,7 @@ from zex.utils.zex_types import SignatureType, TransactionType
 
 
 class CancelSchema(BaseModel):
-    sig_type: int
+    sig_type: SignatureType
     order_nonce: int
     user_id: int
     signature: str
@@ -21,7 +21,7 @@ class CancelSchema(BaseModel):
     def to_message(self) -> "CancelMessage":
         return CancelMessage(
             version=1,
-            signature_type_value=self.sig_type,
+            signature_type=self.sig_type,
             order_nonce=self.order_nonce,
             user_id=self.user_id,
             signature_hex=self.signature,
@@ -35,12 +35,12 @@ class CancelMessage(BaseMessage):
     def __init__(
         self,
         version: int,
-        signature_type_value: int,
+        signature_type: SignatureType,
         order_nonce: int,
         user_id: int,
         signature_hex: str | None = None,
     ) -> None:
-        self.signature_type = SignatureType.from_int(signature_type_value)
+        self.signature_type = signature_type
         self.validate_signature(signature_hex)
         self.signature_hex = signature_hex
 
@@ -82,7 +82,7 @@ class CancelMessage(BaseMessage):
 
         cancel_message = cls(
             version=version,
-            signature_type_value=signature_type,
+            signature_type=SignatureType.from_int(signature_type),
             order_nonce=order_nonce,
             user_id=user_id,
             signature_hex=signature,

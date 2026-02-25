@@ -23,7 +23,7 @@ class TransferStatus(Enum):
 
 
 class TransferSchema(BaseModel):
-    sig_type: int
+    sig_type: SignatureType
     token_name: str
     amount: str
     recipient_id: int
@@ -36,7 +36,7 @@ class TransferSchema(BaseModel):
         mantissa, exponent = to_scientific(Decimal(self.amount))
         return TransferMessage(
             version=1,
-            signature_type_value=self.sig_type,
+            signature_type=self.sig_type,
             token_name=self.token_name,
             amount_mantissa=mantissa,
             amount_exponent=exponent,
@@ -55,7 +55,7 @@ class TransferMessage(BaseMessage):
     def __init__(
         self,
         version: int,
-        signature_type_value: int,
+        signature_type: SignatureType,
         token_name: str,
         amount_mantissa: int,
         amount_exponent: int,
@@ -66,7 +66,7 @@ class TransferMessage(BaseMessage):
         signature_hex: str | None = None,
     ) -> None:
         self.version = version
-        self.signature_type = SignatureType.from_int(signature_type_value)
+        self.signature_type = signature_type
         self.validate_signature(signature_hex)
         self.signature_hex = signature_hex
         self.token_name = token_name
@@ -136,7 +136,7 @@ class TransferMessage(BaseMessage):
 
         transfer_message = cls(
             version=version,
-            signature_type_value=signature_type,
+            signature_type=SignatureType.from_int(signature_type),
             token_name=token_name,
             amount_mantissa=amount_mantissa,
             amount_exponent=amount_exponent,
