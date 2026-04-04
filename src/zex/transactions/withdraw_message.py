@@ -13,7 +13,12 @@ from zex.transactions.exceptions import (
     UnexpectedCommandError,
 )
 from zex.utils.numbers import format_decimal, to_scientific
-from zex.utils.zex_types import ChainName, SignatureType, TransactionType
+from zex.utils.zex_types import (
+    ChainName,
+    ChainNameInvalidValueError,
+    SignatureType,
+    TransactionType,
+)
 
 
 class WithdrawMessage(BaseMessage):
@@ -146,9 +151,10 @@ class WithdrawMessage(BaseMessage):
 
     def __str__(self) -> str:
         amount = format_decimal(Decimal(self.amount_mantissa) * 10 ** Decimal(self.amount_exponent))
-        destination_str, ok = self.chain.destination_to_str(self.destination_wallet)
-        if not ok:
-            raise MessageFormatError("destination_wallet is not valid")
+        try:
+            destination_str = self.chain.address_to_str(self.destination_wallet)
+        except ChainNameInvalidValueError as e:
+            raise MessageFormatError("destination_wallet is not valid") from e
         return (
             f"v: {self.version}\n"
             "name: withdraw\n"
@@ -204,9 +210,10 @@ class WithdrawSchema(BaseModel):
     def to_message(self) -> WithdrawMessage:
         mantissa, exponent = to_scientific(Decimal(self.amount))
         chain = ChainName.from_string(self.token_chain)
-        destination_wallet, ok = chain.destination_to_bytes(self.destination)
-        if not ok:
-            raise ValueError("Invalid destination address.")
+        try:
+            destination_wallet = chain.address_to_bytes(self.destination)
+        except ChainNameInvalidValueError as e:
+            raise ValueError("Invalid destination address.") from e
 
         return WithdrawMessage(
             version=1,

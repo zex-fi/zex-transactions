@@ -1,5 +1,5 @@
-from collections import namedtuple
-from enum import Enum
+from dataclasses import dataclass
+from enum import Enum, StrEnum
 
 import base58
 from eth_utils.address import to_checksum_address
@@ -11,7 +11,7 @@ type TradeId = int
 type DepositId = int
 type WithdrawId = int
 
-type Nonce = int
+type OrderNonce = int
 
 # type ChainName = str
 type CurveName = str
@@ -24,7 +24,7 @@ class SecurityError(Exception):
     pass
 
 
-class Side(Enum):
+class Side(StrEnum):
     BUY = "buy"
     SELL = "sell"
 
@@ -53,15 +53,8 @@ class SignatureType(Enum):
         else:
             raise ValueError("Invalid value for signature type.")
 
-    @classmethod
-    def from_string(cls, value: str) -> "SignatureType":
-        try:
-            return cls[value.upper()]
-        except KeyError as e:
-            raise ValueError(f"'{value}' is not a valid SignatureType.") from e
 
-
-class ExecutionType(Enum):
+class ExecutionType(StrEnum):
     NEW = "NEW"
     CANCELED = "CANCELED"
     REJECTED = "REJECTED"
@@ -69,19 +62,68 @@ class ExecutionType(Enum):
     EXPIRED = "EXPIRED"
 
 
-ChainInfo = namedtuple("ChainInfo", ["id", "abbreviation"])
+class EncodingType(StrEnum):
+    B58 = "b58"
+    HEX = "hex"
+
+
+@dataclass(frozen=True)
+class ChainInfo:
+    id: int
+    abbreviation: str
+    tx_hash_type: EncodingType
+    address_type: EncodingType
+    tx_hash_prefix: str
+
+
+class ChainNameInvalidValueError(Exception):
+    "raise if inputs are not valid for converting types"
 
 
 class ChainName(Enum):
-    # 2. Use the namedtuple to define the value for each member
-    Bitcoin = ChainInfo(id=0, abbreviation="BTC")
-    Solana = ChainInfo(id=1, abbreviation="SOL")
-    Ethereum = ChainInfo(id=2, abbreviation="ETH")
-    Tron = ChainInfo(id=3, abbreviation="TRN")
-    Sepolia = ChainInfo(id=4, abbreviation="SEP")
-    Internal = ChainInfo(id=5, abbreviation="INT")
+    Bitcoin = ChainInfo(
+        id=0,
+        abbreviation="BTC",
+        tx_hash_type=EncodingType.HEX,
+        address_type=EncodingType.B58,
+        tx_hash_prefix="",
+    )
+    Solana = ChainInfo(
+        id=1,
+        abbreviation="SOL",
+        tx_hash_type=EncodingType.B58,
+        address_type=EncodingType.B58,
+        tx_hash_prefix="",
+    )
+    Ethereum = ChainInfo(
+        id=2,
+        abbreviation="ETH",
+        tx_hash_type=EncodingType.HEX,
+        address_type=EncodingType.HEX,
+        tx_hash_prefix="0x",
+    )
+    Tron = ChainInfo(
+        id=3,
+        abbreviation="TRN",
+        tx_hash_type=EncodingType.HEX,
+        address_type=EncodingType.B58,
+        tx_hash_prefix="",
+    )
+    Sepolia = ChainInfo(
+        id=4,
+        abbreviation="SEP",
+        tx_hash_type=EncodingType.HEX,
+        address_type=EncodingType.HEX,
+        tx_hash_prefix="0x",
+    )
+    Internal = ChainInfo(
+        id=5,
+        abbreviation="INT",
+        tx_hash_type=EncodingType.HEX,
+        address_type=EncodingType.HEX,
+        tx_hash_prefix="",
+    )
 
-    # 3. (Optional but recommended) Add properties for cleaner access
     @property
     def id(self) -> int:
         return self.value.id
@@ -90,8 +132,20 @@ class ChainName(Enum):
     def abbreviation(self) -> str:
         return self.value.abbreviation
 
+    @property
+    def tx_hash_type(self) -> EncodingType:
+        return self.value.tx_hash_type
+
+    @property
+    def address_type(self) -> EncodingType:
+        return self.value.address_type
+
+    @property
+    def tx_hash_prefix(self) -> str:
+        return self.value.tx_hash_prefix
+
     @classmethod
-    def from_string(cls, s: str):
+    def from_string(cls, s: str) -> "ChainName":
         """
         Gets a ChainName member from a string (case-insensitive).
         Supports both full name and abbreviation.
@@ -103,82 +157,98 @@ class ChainName(Enum):
                 return member
         raise ValueError(f"'{s}' is not a valid chain name or abbreviation.")
 
-    def contract_to_bytes(self, contract_address: str) -> tuple[bytes, bool]:
-        match self:
-            case ChainName.Bitcoin:
-                return b"", True
-            case ChainName.Solana | ChainName.Tron:
+    def contract_to_bytes(self, contract_address: str) -> bytes:
+        if ChainName.Bitcoin == self:
+            return b""
+
+        try:
+            match self.address_type:
+                case EncodingType.HEX:
+                    return bytes.fromhex(contract_address.removeprefix("0x"))
+                case EncodingType.B58:
+                    return base58.b58decode(contract_address)
+                case _:
+                    raise NotImplementedError(f"chain {self} is not supported")
+        except ValueError as e:
+            raise ChainNameInvalidValueError(
+                f"contract_address: {contract_address} for chain: {self.name} is not valid"
+            ) from e
+
+    def contract_to_str(self, contract_address: bytes) -> str:
+        if ChainName.Bitcoin == self:
+            if len(contract_address) != 0:
+                raise ChainNameInvalidValueError(
+                    f"contract_address: {contract_address} for chain: {self.name} is not valid"
+                )
+            return ""
+
+        match self.address_type:
+            case EncodingType.HEX:
                 try:
-                    return base58.b58decode(contract_address), True
-                except ValueError:
-                    return b"", False
-            case ChainName.Ethereum | ChainName.Sepolia:
+                    return to_checksum_address(contract_address)
+                except (ValueError, TypeError) as e:
+                    raise ChainNameInvalidValueError(
+                        f"contract_address: {contract_address} for chain: {self.name} is not valid"
+                    ) from e
+            case EncodingType.B58:
                 try:
-                    return bytes.fromhex(contract_address[2:]), True
-                except ValueError:
-                    return b"", False
+                    return base58.b58encode(contract_address).decode("utf-8")
+                except UnicodeDecodeError as e:
+                    raise ChainNameInvalidValueError(
+                        f"contract_address: {contract_address} for chain: {self.name} is not valid"
+                    ) from e
             case _:
                 raise NotImplementedError(f"chain {self} is not supported")
 
-    def contract_to_str(self, contract_address: bytes) -> tuple[str, bool]:
-        match self:
-            case ChainName.Bitcoin:
-                if len(contract_address) != 0:
-                    return "", False
-                return "", True
-            case ChainName.Solana | ChainName.Tron:
+    def address_to_str(self, address: bytes) -> str:
+        match self.address_type:
+            case EncodingType.HEX:
                 try:
-                    return base58.b58encode(contract_address).decode("ascii"), True
-                except UnicodeDecodeError:
-                    return "", False
-            case ChainName.Ethereum | ChainName.Sepolia:
-                address_str = "0x" + contract_address.hex()
+                    return to_checksum_address(address)
+                except (ValueError, TypeError) as e:
+                    raise ChainNameInvalidValueError(
+                        f"address: {address} for chain: {self.name} is not valid"
+                    ) from e
+            case EncodingType.B58:
                 try:
-                    return to_checksum_address(address_str), True
-                except (ValueError, TypeError):
-                    return "", False
+                    return address.decode("utf-8")
+                except UnicodeDecodeError as e:
+                    raise ChainNameInvalidValueError(
+                        f"address: {address} for chain: {self.name} is not valid"
+                    ) from e
             case _:
                 raise NotImplementedError(f"chain {self} is not supported")
 
-    def destination_to_str(self, destination: bytes) -> tuple[str, bool]:
-        match self:
-            case ChainName.Bitcoin | ChainName.Solana | ChainName.Tron:
+    def _value_to_bytes(self, value: str, encoding_type: EncodingType) -> bytes:
+        match encoding_type:
+            case EncodingType.HEX:
                 try:
-                    return destination.decode("ascii"), True
-                except UnicodeDecodeError:
-                    return "", False
-
-            case ChainName.Ethereum | ChainName.Sepolia:  # EVM family
+                    return bytes.fromhex(value.removeprefix("0x"))
+                except (ValueError, TypeError) as e:
+                    raise ChainNameInvalidValueError(
+                        f"value: {value} for chain: {self.name} is not valid"
+                    ) from e
+            case EncodingType.B58:
                 try:
-                    return to_checksum_address("0x" + destination.hex()), True
-                except (ValueError, TypeError):
-                    return "", False
+                    return base58.b58decode(value)
+                except ValueError as e:
+                    raise ChainNameInvalidValueError(
+                        f"value: {value} for chain: {self.name} is not valid"
+                    ) from e
             case _:
                 raise NotImplementedError(f"chain {self} is not supported")
 
-    def destination_to_bytes(self, destination: str) -> tuple[bytes, bool]:
-        match self:
-            case ChainName.Bitcoin | ChainName.Solana | ChainName.Tron:
-                try:
-                    return destination.encode("ascii"), True
-                except UnicodeEncodeError:
-                    return b"", False
+    def address_to_bytes(self, address: str) -> bytes:
+        return self._value_to_bytes(address, self.address_type)
 
-            case ChainName.Ethereum | ChainName.Sepolia:  # EVM family
-                try:
-                    return bytes.fromhex(destination[2:]), True
-                except (ValueError, TypeError):
-                    return b"", False
+    def tx_hash_to_str(self, tx_hash: bytes) -> str:
+        match self.tx_hash_type:
+            case EncodingType.HEX:
+                return self.tx_hash_prefix + tx_hash.hex()
+            case EncodingType.B58:
+                return base58.b58encode(tx_hash).decode("utf-8")
             case _:
                 raise NotImplementedError(f"chain {self} is not supported")
 
-    def tx_hash_to_str(self, tx_hash: bytes):
-        match self:
-            case ChainName.Bitcoin | ChainName.Tron:
-                return tx_hash.hex()
-            case ChainName.Solana:
-                return base58.b58encode(tx_hash).decode("ascii")
-            case ChainName.Ethereum | ChainName.Sepolia:
-                return "0x" + tx_hash.hex()
-            case _:
-                raise NotImplementedError(f"chain {self.abbreviation} is not supported")
+    def tx_hash_to_bytes(self, tx_hash: str) -> bytes:
+        return self._value_to_bytes(tx_hash, self.tx_hash_type)
