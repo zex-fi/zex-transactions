@@ -182,42 +182,32 @@ class ChainName(Enum):
                 )
             return ""
 
-        match self.address_type:
-            case EncodingType.HEX:
-                try:
+        try:
+            match self.address_type:
+                case EncodingType.HEX:
                     return to_checksum_address(contract_address)
-                except (ValueError, TypeError) as e:
-                    raise ChainNameInvalidValueError(
-                        f"contract_address: {contract_address} for chain: {self.name} is not valid"
-                    ) from e
-            case EncodingType.B58:
-                try:
+                case EncodingType.B58:
                     return base58.b58encode(contract_address).decode("utf-8")
-                except UnicodeDecodeError as e:
-                    raise ChainNameInvalidValueError(
-                        f"contract_address: {contract_address} for chain: {self.name} is not valid"
-                    ) from e
-            case _:
-                raise NotImplementedError(f"chain {self} is not supported")
+                case _:
+                    raise NotImplementedError(f"chain {self} is not supported")
+        except (ValueError, TypeError) as e:
+            raise ChainNameInvalidValueError(
+                f"contract_address: {contract_address} for chain: {self.name} is not valid"
+            ) from e
 
     def address_to_str(self, address: bytes) -> str:
-        match self.address_type:
-            case EncodingType.HEX:
-                try:
+        try:
+            match self.address_type:
+                case EncodingType.HEX:
                     return to_checksum_address(address)
-                except (ValueError, TypeError) as e:
-                    raise ChainNameInvalidValueError(
-                        f"address: {address} for chain: {self.name} is not valid"
-                    ) from e
-            case EncodingType.B58:
-                try:
-                    return address.decode("utf-8")
-                except UnicodeDecodeError as e:
-                    raise ChainNameInvalidValueError(
-                        f"address: {address} for chain: {self.name} is not valid"
-                    ) from e
-            case _:
-                raise NotImplementedError(f"chain {self} is not supported")
+                case EncodingType.B58:
+                    return base58.b58encode(address).decode("utf-8")
+                case _:
+                    raise NotImplementedError(f"chain {self} is not supported")
+        except (ValueError, TypeError) as e:
+            raise ChainNameInvalidValueError(
+                f"address: {address} for chain: {self.name} is not valid"
+            ) from e
 
     def _value_to_bytes(self, value: str, encoding_type: EncodingType) -> bytes:
         match encoding_type:
@@ -246,7 +236,12 @@ class ChainName(Enum):
             case EncodingType.HEX:
                 return self.tx_hash_prefix + tx_hash.hex()
             case EncodingType.B58:
-                return base58.b58encode(tx_hash).decode("utf-8")
+                try:
+                    return base58.b58encode(tx_hash).decode("utf-8")
+                except (TypeError, ValueError) as e:
+                    raise ChainNameInvalidValueError(
+                        f"tx_hash: {tx_hash} for chain: {self.name} is not valid"
+                    ) from e
             case _:
                 raise NotImplementedError(f"chain {self} is not supported")
 
