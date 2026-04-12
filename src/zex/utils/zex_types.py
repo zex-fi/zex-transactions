@@ -65,6 +65,7 @@ class ExecutionType(StrEnum):
 class EncodingType(StrEnum):
     B58 = "b58"
     HEX = "hex"
+    UTF8 = "utf-8"
 
 
 @dataclass(frozen=True)
@@ -85,7 +86,7 @@ class ChainName(Enum):
         id=0,
         abbreviation="BTC",
         tx_hash_type=EncodingType.HEX,
-        address_type=EncodingType.B58,
+        address_type=EncodingType.UTF8,
         tx_hash_prefix="",
     )
     Solana = ChainInfo(
@@ -202,31 +203,30 @@ class ChainName(Enum):
                     return to_checksum_address(address)
                 case EncodingType.B58:
                     return base58.b58encode(address).decode("utf-8")
+                case EncodingType.UTF8:
+                    return address.decode("utf-8")
                 case _:
                     raise NotImplementedError(f"chain {self} is not supported")
-        except (ValueError, TypeError) as e:
+        except (ValueError, TypeError, AttributeError) as e:
             raise ChainNameInvalidValueError(
                 f"address: {address} for chain: {self.name} is not valid"
             ) from e
 
     def _value_to_bytes(self, value: str, encoding_type: EncodingType) -> bytes:
-        match encoding_type:
-            case EncodingType.HEX:
-                try:
+        try:
+            match encoding_type:
+                case EncodingType.HEX:
                     return bytes.fromhex(value.removeprefix("0x"))
-                except (ValueError, TypeError) as e:
-                    raise ChainNameInvalidValueError(
-                        f"value: {value} for chain: {self.name} is not valid"
-                    ) from e
-            case EncodingType.B58:
-                try:
+                case EncodingType.B58:
                     return base58.b58decode(value)
-                except ValueError as e:
-                    raise ChainNameInvalidValueError(
-                        f"value: {value} for chain: {self.name} is not valid"
-                    ) from e
-            case _:
-                raise NotImplementedError(f"chain {self} is not supported")
+                case EncodingType.UTF8:
+                    return value.encode("utf-8")
+                case _:
+                    raise NotImplementedError(f"chain {self} is not supported")
+        except (ValueError, TypeError, AttributeError) as e:
+            raise ChainNameInvalidValueError(
+                f"value: {value} for chain: {self.name} is not valid"
+            ) from e
 
     def address_to_bytes(self, address: str) -> bytes:
         return self._value_to_bytes(address, self.address_type)
