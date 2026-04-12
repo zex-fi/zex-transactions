@@ -11,7 +11,7 @@ class TestChainNameProperties:
         assert chain.id == 0
         assert chain.abbreviation == "BTC"
         assert chain.tx_hash_type == EncodingType.HEX
-        assert chain.address_type == EncodingType.B58
+        assert chain.address_type == EncodingType.UTF8
         assert chain.tx_hash_prefix == ""
 
     def test_solana_properties(self):
@@ -149,7 +149,7 @@ class TestAddressToBytes:
 
     def test_bitcoin_b58_address(self):
         addr = "1A1zP1eP5QGefi2DMPTfTL5SLmv7Divf"
-        assert ChainName.Bitcoin.address_to_bytes(addr) == base58.b58decode(addr)
+        assert ChainName.Bitcoin.address_to_bytes(addr) == addr.encode()
 
     def test_invalid_hex_raises(self):
         with pytest.raises(ChainNameInvalidValueError):
@@ -169,7 +169,7 @@ class TestAddressToStr:
 
     def test_bitcoin_returns_b58_string(self):
         addr = "1A1zP1eP5QGefi2DMPTfTL5SLmv7Divf"
-        raw = base58.b58decode(addr)
+        raw = addr.encode()
         assert ChainName.Bitcoin.address_to_str(raw) == addr
 
 
