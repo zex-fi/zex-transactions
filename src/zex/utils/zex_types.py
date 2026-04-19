@@ -38,6 +38,7 @@ class TransactionType(Enum):
     CANCEL = ord("c")
     TRANSFER = ord("t")
     PAUSE = ord("p")
+    UPDATE_WITHDRAW = ord("u")
 
 
 class SignatureType(Enum):

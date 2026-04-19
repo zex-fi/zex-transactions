@@ -1,0 +1,243 @@
+from struct import calcsize, pack, unpack
+from struct import error as struct_error
+from typing import Any, ClassVar, Literal, Self
+
+from eth_account.messages import encode_defunct
+from pydantic import BaseModel
+from web3 import Web3
+from zexfrost.utils import get_curve
+
+from zex.transactions.base_message import BaseMessage
+from zex.transactions.exceptions import (
+    HeaderFormatError,
+    MessageFormatError,
+    UnexpectedCommandError,
+)
+from zex.utils.zex_types import ChainName, TransactionType
+
+curve = get_curve(curve="secp256k1")
+
+
+class Withdraw(BaseModel):
+    BYTES_FORMAT: ClassVar[str] = "> 1s Q {transaction_hash_length}s"
+
+    status: Literal["r", "s"]
+    id: int
+    tx_hash: bytes
+
+    def to_bytes(self: Self) -> bytes:
+        try:
+            return pack(
+                self.BYTES_FORMAT.format(transaction_hash_length=len(self.tx_hash)),
+                self.status.encode(),
+                self.id,
+                self.tx_hash,
+            )
+        except struct_error as e:
+            raise MessageFormatError(f"Failed to pack withdraw: {e}") from e
+
+    @classmethod
+    def from_bytes(cls, data: bytes, transaction_hash_length: int) -> Self:
+        try:
+            status, id, tx_hash = unpack(
+                cls.BYTES_FORMAT.format(transaction_hash_length=transaction_hash_length), data
+            )
+        except struct_error as e:
+            raise MessageFormatError(f"Failed to unpack withdraw: {e}") from e
+        return cls(status=status.decode(), id=id, tx_hash=tx_hash)
+
+
+class UpdateWithdrawMessage(BaseMessage):
+    TRANSACTION_TYPE = TransactionType.UPDATE_WITHDRAW
+    HEADER_LENGTH = 8
+    FROST_SIGNATURE_LENGTH = 65
+    ECDSA_SIGNATURE_LENGTH = 65
+    SIGNATURE_LENGTH = FROST_SIGNATURE_LENGTH + ECDSA_SIGNATURE_LENGTH
+
+    def __init__(
+        self,
+        version: int,
+        chain: ChainName,
+        transaction_hash_length: int,
+        withdraws: list[Withdraw],
+        frost_signature: bytes | None = None,
+        ecdsa_signature: bytes | None = None,
+    ) -> None:
+        self.version = version
+        self.chain = chain
+
+        if frost_signature is not None and len(frost_signature) != self.FROST_SIGNATURE_LENGTH:
+            raise ValueError("The length of given frost signature does not match.")
+        self.frost_signature = frost_signature
+
+        if ecdsa_signature is not None and len(ecdsa_signature) != self.ECDSA_SIGNATURE_LENGTH:
+            raise ValueError("The length of given ecdsa signature does not match.")
+        self.ecdsa_signature = ecdsa_signature
+        self.transaction_hash_length = transaction_hash_length
+        if not withdraws:
+            raise ValueError("withdraws must not be empty.")
+        self.withdraws = withdraws
+
+        self._transaction_bytes: bytes | None = None
+
+    @classmethod
+    def from_bytes(cls, transaction_bytes: bytes) -> Self:
+        if len(transaction_bytes) < cls.HEADER_LENGTH:
+            raise HeaderFormatError("Transaction is too short for header.")
+        header_bytes = transaction_bytes[: cls.HEADER_LENGTH]
+        header_format = cls.get_header_format()
+        try:
+            (
+                version,
+                command,
+                chain_bytes,
+                transaction_hash_length,
+                withdraws_count,
+            ) = unpack(header_format, header_bytes)
+        except struct_error as e:
+            raise HeaderFormatError(f"Failed to unpack header: {e}") from e
+        if command != cls.TRANSACTION_TYPE.value:
+            raise UnexpectedCommandError("Unexpected command.")
+        if withdraws_count == 0:
+            raise MessageFormatError("Invalid withdraw count.")
+
+        body_format = cls.get_body_format(transaction_hash_length)
+        body_size = calcsize(body_format)
+        total_body_size = body_size * withdraws_count
+        if len(transaction_bytes) - cls.HEADER_LENGTH - cls.SIGNATURE_LENGTH < total_body_size:
+            raise MessageFormatError(
+                "Transaction body is too short for the specified withdraw count."
+            )
+        withdraws = []
+        for i in range(withdraws_count):
+            index = i * body_size
+            withdraw_bytes = transaction_bytes[
+                cls.HEADER_LENGTH + index : cls.HEADER_LENGTH + index + body_size
+            ]
+            withdraws.append(Withdraw.from_bytes(withdraw_bytes, transaction_hash_length))
+
+        frost_signature, ecdsa_signature = unpack(
+            cls.get_signature_format(),
+            transaction_bytes[-cls.SIGNATURE_LENGTH :],
+        )
+
+        withdraw_message = cls(
+            version=version,
+            chain=ChainName.from_string(chain_bytes.decode("utf-8")),
+            transaction_hash_length=transaction_hash_length,
+            withdraws=withdraws,
+            frost_signature=frost_signature,
+            ecdsa_signature=ecdsa_signature,
+        )
+        withdraw_message._transaction_bytes = transaction_bytes
+        return withdraw_message
+
+    @classmethod
+    def get_header_format(cls) -> str:
+        return ">B B 3s B H"
+
+    @classmethod
+    def get_body_format(cls, transaction_hash_length: int) -> str:
+        return Withdraw.BYTES_FORMAT.format(transaction_hash_length=transaction_hash_length)
+
+    @classmethod
+    def get_signature_format(cls) -> str:
+        return f">{cls.FROST_SIGNATURE_LENGTH}s {cls.ECDSA_SIGNATURE_LENGTH}s"
+
+    @classmethod
+    def get_message_format(
+        cls,
+        transaction_hash_length: int,
+    ) -> str:
+        return cls.get_header_format() + cls.get_body_format(transaction_hash_length)[1:]
+
+    @classmethod
+    def get_format(cls, transaction_hash_length: int) -> str:
+        return (
+            cls.get_message_format(
+                transaction_hash_length,
+            )
+            + cls.get_signature_format()[1:]
+        )
+
+    def __str__(self) -> str:
+        return (
+            f"version: {self.version}, "
+            f"chain: {self.chain.abbreviation}, "
+            f"transaction_hash_length: {self.transaction_hash_length}, "
+            f"withdraws: {self.withdraws}, "
+            f"frost_signature: {self.frost_signature}, "
+            f"ecdsa_signature: {self.ecdsa_signature}"
+        )
+
+    def to_bytes(self) -> bytes:
+        if self._transaction_bytes is not None:
+            return self._transaction_bytes
+        if self.frost_signature is None or self.ecdsa_signature is None:
+            raise ValueError("Cannot serialize message without both signatures")
+        transaction_bytes = self.create_message() + pack(
+            self.get_signature_format(),
+            self.frost_signature,
+            self.ecdsa_signature,
+        )
+        self._transaction_bytes = transaction_bytes
+        return transaction_bytes
+
+    def create_message(self) -> bytes:
+        body = b""
+        for withdraw in self.withdraws:
+            body += withdraw.to_bytes()
+
+        return (
+            pack(
+                self.get_header_format(),
+                *self._get_header_arguments(),
+            )
+            + body
+        )
+
+    def _get_header_arguments(self) -> list[Any]:
+        return [
+            self.version,
+            self.TRANSACTION_TYPE.value,
+            self.chain.abbreviation.encode("utf-8"),
+            self.transaction_hash_length,
+            len(self.withdraws),
+        ]
+
+    def verify_frost_signature(self, frost_public_key: str) -> bool:
+        assert self.frost_signature is not None
+
+        transaction_bytes = self._transaction_bytes or self.to_bytes()
+        message = transaction_bytes[: -self.SIGNATURE_LENGTH]
+
+        frost_verified = curve.single_verify(
+            self.frost_signature.hex(),
+            message,
+            frost_public_key,
+        )
+        return frost_verified
+
+    def verify_ecdsa_signature(self, shield_address: str) -> bool:
+        assert self.ecdsa_signature is not None
+
+        transaction_bytes = self._transaction_bytes or self.to_bytes()
+        message = transaction_bytes[: -self.SIGNATURE_LENGTH]
+
+        eth_signed_message = encode_defunct(message)
+        recovered_address = Web3.eth.account.recover_message(
+            eth_signed_message, signature=self.ecdsa_signature
+        )
+        ecdsa_verified = recovered_address == shield_address
+        return ecdsa_verified
+
+    def verify_signature(
+        self,
+        frost_public_key: str,
+        shield_address: str,
+    ) -> bool:
+
+        frost_verified = self.verify_frost_signature(frost_public_key)
+        ecdsa_verified = self.verify_ecdsa_signature(shield_address)
+
+        return frost_verified and ecdsa_verified

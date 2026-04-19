@@ -17,5 +17,6 @@ from .sell_message import SellMessage as SellMessage
 from .sell_message import SellSchema as SellSchema
 from .transfer_message import TransferMessage as TransferMessage
 from .transfer_message import TransferSchema as TransferSchema
+from .update_withdraw_message import UpdateWithdrawMessage as UpdateWithdrawMessage
 from .withdraw_message import WithdrawMessage as WithdrawMessage
 from .withdraw_message import WithdrawSchema as WithdrawSchema
