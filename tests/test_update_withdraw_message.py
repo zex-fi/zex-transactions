@@ -168,7 +168,7 @@ class TestUpdateWithdrawMessageFromBytes:
         )
         sig = pack(UpdateWithdrawMessage.get_signature_format(), self.FROST_SIG, self.ECDSA_SIG)
         data = header + sig  # no body
-        with pytest.raises(MessageFormatError, match="Transaction body is too short"):
+        with pytest.raises(MessageFormatError, match="Transaction length does not match the specified withdraw count."):
             UpdateWithdrawMessage.from_bytes(data)
 
     def test_given_valid_single_withdraw_when_calling_from_bytes_then_returns_correct_version(
@@ -278,6 +278,31 @@ class TestUpdateWithdrawMessageInit:
         )
         assert msg.frost_signature is None
         assert msg.ecdsa_signature is None
+
+    def test_given_withdraw_with_mismatched_tx_hash_length_when_creating_then_raises_value_error(
+        self,
+    ) -> None:
+        with pytest.raises(ValueError, match="All withdraw tx_hash lengths must match transaction_hash_length"):
+            UpdateWithdrawMessage(
+                version=1,
+                chain=ChainName.Ethereum,
+                transaction_hash_length=4,
+                withdraws=[Withdraw(status="r", id=1, tx_hash=b"\x00" * 8)],  # 8 != 4
+            )
+
+    def test_given_multiple_withdraws_with_one_mismatched_tx_hash_when_creating_then_raises_value_error(
+        self,
+    ) -> None:
+        with pytest.raises(ValueError, match="All withdraw tx_hash lengths must match transaction_hash_length"):
+            UpdateWithdrawMessage(
+                version=1,
+                chain=ChainName.Ethereum,
+                transaction_hash_length=4,
+                withdraws=[
+                    Withdraw(status="r", id=1, tx_hash=b"\x00" * 4),
+                    Withdraw(status="s", id=2, tx_hash=b"\x00" * 6),  # 6 != 4
+                ],
+            )
 
     def test_given_valid_signatures_when_creating_then_stored_correctly(self) -> None:
         frost = b"\xaa" * 65
@@ -501,14 +526,14 @@ class TestUpdateWithdrawMessageVerifyFrostSignature:
         msg = UpdateWithdrawMessage.from_bytes(data)
         with patch("zex.transactions.update_withdraw_message.curve") as mock_curve:
             mock_curve.single_verify.return_value = True
-            assert msg.verify_frost_signature("some_frost_public_key") is True
+            assert msg._verify_frost_signature("some_frost_public_key") is True
 
     def test_given_curve_returns_false_when_verifying_frost_then_returns_false(self) -> None:
         data = _build_transaction_bytes(frost_sig=self.FROST_SIG, ecdsa_sig=self.ECDSA_SIG)
         msg = UpdateWithdrawMessage.from_bytes(data)
         with patch("zex.transactions.update_withdraw_message.curve") as mock_curve:
             mock_curve.single_verify.return_value = False
-            assert msg.verify_frost_signature("some_frost_public_key") is False
+            assert msg._verify_frost_signature("some_frost_public_key") is False
 
     def test_given_valid_call_when_verifying_frost_then_calls_single_verify_with_correct_args(
         self,
@@ -518,7 +543,7 @@ class TestUpdateWithdrawMessageVerifyFrostSignature:
         expected_message = data[: -UpdateWithdrawMessage.SIGNATURE_LENGTH]
         with patch("zex.transactions.update_withdraw_message.curve") as mock_curve:
             mock_curve.single_verify.return_value = True
-            msg.verify_frost_signature("my_frost_key")
+            msg._verify_frost_signature("my_frost_key")
             mock_curve.single_verify.assert_called_once_with(
                 self.FROST_SIG.hex(), expected_message, "my_frost_key"
             )
@@ -535,7 +560,7 @@ class TestUpdateWithdrawMessageVerifyEcdsaSignature:
             "zex.transactions.update_withdraw_message.encode_defunct"
         ):
             mock_web3.eth.account.recover_message.return_value = "0xShieldAddress"
-            assert msg.verify_ecdsa_signature("0xShieldAddress") is True
+            assert msg._verify_ecdsa_signature("0xShieldAddress") is True
 
     def test_given_recovered_address_does_not_match_when_verifying_ecdsa_then_returns_false(self) -> None:
         data = _build_transaction_bytes(frost_sig=self.FROST_SIG, ecdsa_sig=self.ECDSA_SIG)
@@ -544,7 +569,7 @@ class TestUpdateWithdrawMessageVerifyEcdsaSignature:
             "zex.transactions.update_withdraw_message.encode_defunct"
         ):
             mock_web3.eth.account.recover_message.return_value = "0xDifferentAddress"
-            assert msg.verify_ecdsa_signature("0xShieldAddress") is False
+            assert msg._verify_ecdsa_signature("0xShieldAddress") is False
 
     def test_given_valid_call_when_verifying_ecdsa_then_calls_recover_message_with_correct_args(
         self,
@@ -556,7 +581,7 @@ class TestUpdateWithdrawMessageVerifyEcdsaSignature:
             "zex.transactions.update_withdraw_message.encode_defunct"
         ) as mock_encode_defunct:
             mock_web3.eth.account.recover_message.return_value = "0xShieldAddress"
-            msg.verify_ecdsa_signature("0xShieldAddress")
+            msg._verify_ecdsa_signature("0xShieldAddress")
             mock_encode_defunct.assert_called_once_with(expected_message)
             mock_web3.eth.account.recover_message.assert_called_once_with(
                 mock_encode_defunct.return_value, signature=self.ECDSA_SIG
@@ -570,23 +595,23 @@ class TestUpdateWithdrawMessageVerifySignature:
     def test_given_both_signatures_valid_when_verifying_then_returns_true(self) -> None:
         data = _build_transaction_bytes(frost_sig=self.FROST_SIG, ecdsa_sig=self.ECDSA_SIG)
         msg = UpdateWithdrawMessage.from_bytes(data)
-        with patch.object(msg, "verify_frost_signature", return_value=True), patch.object(
-            msg, "verify_ecdsa_signature", return_value=True
+        with patch.object(msg, "_verify_frost_signature", return_value=True), patch.object(
+            msg, "_verify_ecdsa_signature", return_value=True
         ):
-            assert msg.verify_signature("frost_key", "shield_address") is True
+            assert msg.verify_signature(b"", "frost_key", "shield_address") is True
 
     def test_given_frost_signature_invalid_when_verifying_then_returns_false(self) -> None:
         data = _build_transaction_bytes(frost_sig=self.FROST_SIG, ecdsa_sig=self.ECDSA_SIG)
         msg = UpdateWithdrawMessage.from_bytes(data)
-        with patch.object(msg, "verify_frost_signature", return_value=False), patch.object(
-            msg, "verify_ecdsa_signature", return_value=True
+        with patch.object(msg, "_verify_frost_signature", return_value=False), patch.object(
+            msg, "_verify_ecdsa_signature", return_value=True
         ):
-            assert msg.verify_signature("frost_key", "shield_address") is False
+            assert msg.verify_signature(b"", "frost_key", "shield_address") is False
 
     def test_given_ecdsa_signature_invalid_when_verifying_then_returns_false(self) -> None:
         data = _build_transaction_bytes(frost_sig=self.FROST_SIG, ecdsa_sig=self.ECDSA_SIG)
         msg = UpdateWithdrawMessage.from_bytes(data)
-        with patch.object(msg, "verify_frost_signature", return_value=True), patch.object(
-            msg, "verify_ecdsa_signature", return_value=False
+        with patch.object(msg, "_verify_frost_signature", return_value=True), patch.object(
+            msg, "_verify_ecdsa_signature", return_value=False
         ):
-            assert msg.verify_signature("frost_key", "shield_address") is False
+            assert msg.verify_signature(b"", "frost_key", "shield_address") is False

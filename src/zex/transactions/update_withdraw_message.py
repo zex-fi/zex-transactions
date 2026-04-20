@@ -2,7 +2,10 @@ from struct import calcsize, pack, unpack
 from struct import error as struct_error
 from typing import Any, ClassVar, Literal, Self
 
+from coincurve import PrivateKey
+from eth_account import Account
 from eth_account.messages import encode_defunct
+from frost_lib.custom_types import KeyPair
 from pydantic import BaseModel
 from web3 import Web3
 from zexfrost.utils import get_curve
@@ -73,9 +76,12 @@ class UpdateWithdrawMessage(BaseMessage):
         if ecdsa_signature is not None and len(ecdsa_signature) != self.ECDSA_SIGNATURE_LENGTH:
             raise ValueError("The length of given ecdsa signature does not match.")
         self.ecdsa_signature = ecdsa_signature
+        if any(len(w.tx_hash) != transaction_hash_length for w in withdraws):
+            raise ValueError("All withdraw tx_hash lengths must match transaction_hash_length.")
         self.transaction_hash_length = transaction_hash_length
         if not withdraws:
             raise ValueError("withdraws must not be empty.")
+
         self.withdraws = withdraws
 
         self._transaction_bytes: bytes | None = None
@@ -104,9 +110,9 @@ class UpdateWithdrawMessage(BaseMessage):
         body_format = cls.get_body_format(transaction_hash_length)
         body_size = calcsize(body_format)
         total_body_size = body_size * withdraws_count
-        if len(transaction_bytes) - cls.HEADER_LENGTH - cls.SIGNATURE_LENGTH < total_body_size:
+        if len(transaction_bytes) - cls.HEADER_LENGTH - cls.SIGNATURE_LENGTH != total_body_size:
             raise MessageFormatError(
-                "Transaction body is too short for the specified withdraw count."
+                "Transaction length does not match the specified withdraw count."
             )
         withdraws = []
         for i in range(withdraws_count):
@@ -162,11 +168,11 @@ class UpdateWithdrawMessage(BaseMessage):
 
     def __str__(self) -> str:
         return (
-            f"version: {self.version}, "
-            f"chain: {self.chain.abbreviation}, "
-            f"transaction_hash_length: {self.transaction_hash_length}, "
-            f"withdraws: {self.withdraws}, "
-            f"frost_signature: {self.frost_signature}, "
+            f"version: {self.version},\n"
+            f"chain: {self.chain.abbreviation},\n"
+            f"transaction_hash_length: {self.transaction_hash_length},\n"
+            f"withdraws: {self.withdraws},\n"
+            f"frost_signature: {self.frost_signature},\n"
             f"ecdsa_signature: {self.ecdsa_signature}"
         )
 
@@ -205,7 +211,19 @@ class UpdateWithdrawMessage(BaseMessage):
             len(self.withdraws),
         ]
 
-    def verify_frost_signature(self, frost_public_key: str) -> bool:
+    def verify_signature(
+        self,
+        public_key_bytes: bytes,
+        frost_public_key: str,
+        shield_address: str,
+    ) -> bool:
+
+        frost_verified = self._verify_frost_signature(frost_public_key)
+        ecdsa_verified = self._verify_ecdsa_signature(shield_address)
+
+        return frost_verified and ecdsa_verified
+
+    def _verify_frost_signature(self, frost_public_key: str) -> bool:
         assert self.frost_signature is not None
 
         transaction_bytes = self._transaction_bytes or self.to_bytes()
@@ -218,7 +236,7 @@ class UpdateWithdrawMessage(BaseMessage):
         )
         return frost_verified
 
-    def verify_ecdsa_signature(self, shield_address: str) -> bool:
+    def _verify_ecdsa_signature(self, shield_address: str) -> bool:
         assert self.ecdsa_signature is not None
 
         transaction_bytes = self._transaction_bytes or self.to_bytes()
@@ -231,13 +249,33 @@ class UpdateWithdrawMessage(BaseMessage):
         ecdsa_verified = recovered_address == shield_address
         return ecdsa_verified
 
-    def verify_signature(
+    def sign(
         self,
-        frost_public_key: str,
-        shield_address: str,
-    ) -> bool:
+        private_key: PrivateKey,
+        frost_keypair: KeyPair,
+        ecdsa_account: Account,
+    ) -> bytes:
+        message = self.create_message()
+        return message + pack(
+            self.get_signature_format(),
+            self._create_frost_signature(message, frost_keypair),
+            self._create_ecdsa_signature(message, ecdsa_account),
+        )
 
-        frost_verified = self.verify_frost_signature(frost_public_key)
-        ecdsa_verified = self.verify_ecdsa_signature(shield_address)
+    def _create_frost_signature(self, message: bytes, frost_keypair: KeyPair) -> bytes:
+        if self.frost_signature is not None:
+            return self.frost_signature
+        frost_signature = bytes.fromhex(curve.single_sign(frost_keypair.signing_key, message))
+        assert len(frost_signature) == self.FROST_SIGNATURE_LENGTH
+        self.frost_signature = frost_signature
+        return frost_signature
 
-        return frost_verified and ecdsa_verified
+    def _create_ecdsa_signature(self, message: bytes, ecdsa_account: Account) -> bytes:
+        if self.ecdsa_signature is not None:
+            return self.ecdsa_signature
+        eth_signed_message = encode_defunct(message)
+        signed_message = ecdsa_account.sign_message(eth_signed_message)
+        ecdsa_signature = signed_message.signature
+        assert len(ecdsa_signature) == self.ECDSA_SIGNATURE_LENGTH
+        self.ecdsa_signature = ecdsa_signature
+        return ecdsa_signature
