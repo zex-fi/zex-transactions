@@ -1,6 +1,6 @@
 [project]
 name = "zex-transactions"
-version = "0.2.2"
+version = "0.3.0"
 description = "ZEX transaction encoding, signing, and validation logic"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
@@ -12,6 +12,7 @@ dependencies = [
     "eth-account>=0.13.7",
     "eth-hash>=0.7.1",
     "eth-utils>=5.3.1",
+    "frost-lib",
     "pydantic>=2.10.6",
     "solders>=0.27.1",
     "web3>=7.4.0",
@@ -167,6 +168,9 @@ exclude = [
     "tests",
 ]
 known_first_party = ["zex"]
+
+[tool.uv.sources]
+frost-lib = { git = "https://github.com/sadeghte/frost-lib-py" }
 
 
 [tool.ruff.format]
