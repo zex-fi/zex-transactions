@@ -1,6 +1,6 @@
 [project]
 name = "zex-transactions"
-version = "0.3.0"
+version = "0.3.1"
 description = "ZEX transaction encoding, signing, and validation logic"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
@@ -15,7 +15,6 @@ dependencies = [
     "frost-lib",
     "pydantic>=2.10.6",
     "solders>=0.27.1",
-    "web3>=7.4.0",
     "zexfrost @ git+https://github.com/zex-fi/zexfrost.git",
 ]
 
@@ -150,7 +149,6 @@ asyncio_default_fixture_loop_scope = "function"
 pythonpath = [".", "src"]
 filterwarnings = [
     "ignore::DeprecationWarning:websockets.*",
-    "ignore::DeprecationWarning:web3.*",
     "ignore::DeprecationWarning:websockets.legacy",
     "ignore::DeprecationWarning:multiprocessing.popen_fork",
     "ignore::UserWarning:redislite.*",
