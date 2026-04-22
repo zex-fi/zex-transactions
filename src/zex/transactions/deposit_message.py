@@ -8,7 +8,6 @@ from coincurve import PrivateKey
 from eth_account import Account
 from eth_account.messages import encode_defunct
 from pydantic import BaseModel
-from web3 import Web3
 from zexfrost.utils import get_curve
 
 from zex.transactions.base_message import BaseMessage
@@ -17,8 +16,6 @@ from zex.transactions.exceptions import (
     UnexpectedCommandError,
 )
 from zex.utils.zex_types import ChainName, TransactionType
-
-w3 = Web3()
 
 curve = get_curve(curve="secp256k1")
 
@@ -282,7 +279,7 @@ class DepositMessage(BaseMessage):
 
         # Verify ECDSA signature
         eth_signed_message = encode_defunct(message)
-        recovered_address = w3.eth.account.recover_message(
+        recovered_address = Account.recover_message(
             eth_signed_message, signature=self.ecdsa_signature
         )
         deposit_shield_address = deposit_shield_address

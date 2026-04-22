@@ -556,19 +556,19 @@ class TestUpdateWithdrawMessageVerifyEcdsaSignature:
     def test_given_recovered_address_matches_when_verifying_ecdsa_then_returns_true(self) -> None:
         data = _build_transaction_bytes(frost_sig=self.FROST_SIG, ecdsa_sig=self.ECDSA_SIG)
         msg = UpdateWithdrawMessage.from_bytes(data)
-        with patch("zex.transactions.update_withdraw_message.Web3") as mock_web3, patch(
+        with patch("zex.transactions.update_withdraw_message.Account") as mock_account, patch(
             "zex.transactions.update_withdraw_message.encode_defunct"
         ):
-            mock_web3.eth.account.recover_message.return_value = "0xShieldAddress"
+            mock_account.recover_message.return_value = "0xShieldAddress"
             assert msg._verify_ecdsa_signature("0xShieldAddress") is True
 
     def test_given_recovered_address_does_not_match_when_verifying_ecdsa_then_returns_false(self) -> None:
         data = _build_transaction_bytes(frost_sig=self.FROST_SIG, ecdsa_sig=self.ECDSA_SIG)
         msg = UpdateWithdrawMessage.from_bytes(data)
-        with patch("zex.transactions.update_withdraw_message.Web3") as mock_web3, patch(
+        with patch("zex.transactions.update_withdraw_message.Account") as mock_account, patch(
             "zex.transactions.update_withdraw_message.encode_defunct"
         ):
-            mock_web3.eth.account.recover_message.return_value = "0xDifferentAddress"
+            mock_account.recover_message.return_value = "0xDifferentAddress"
             assert msg._verify_ecdsa_signature("0xShieldAddress") is False
 
     def test_given_valid_call_when_verifying_ecdsa_then_calls_recover_message_with_correct_args(
@@ -577,13 +577,13 @@ class TestUpdateWithdrawMessageVerifyEcdsaSignature:
         data = _build_transaction_bytes(frost_sig=self.FROST_SIG, ecdsa_sig=self.ECDSA_SIG)
         msg = UpdateWithdrawMessage.from_bytes(data)
         expected_message = data[: -UpdateWithdrawMessage.SIGNATURE_LENGTH]
-        with patch("zex.transactions.update_withdraw_message.Web3") as mock_web3, patch(
+        with patch("zex.transactions.update_withdraw_message.Account") as mock_account, patch(
             "zex.transactions.update_withdraw_message.encode_defunct"
         ) as mock_encode_defunct:
-            mock_web3.eth.account.recover_message.return_value = "0xShieldAddress"
+            mock_account.recover_message.return_value = "0xShieldAddress"
             msg._verify_ecdsa_signature("0xShieldAddress")
             mock_encode_defunct.assert_called_once_with(expected_message)
-            mock_web3.eth.account.recover_message.assert_called_once_with(
+            mock_account.recover_message.assert_called_once_with(
                 mock_encode_defunct.return_value, signature=self.ECDSA_SIG
             )
 

@@ -7,7 +7,6 @@ from eth_account import Account
 from eth_account.messages import encode_defunct
 from frost_lib.custom_types import KeyPair
 from pydantic import BaseModel
-from web3 import Web3
 from zexfrost.utils import get_curve
 
 from zex.transactions.base_message import BaseMessage
@@ -243,7 +242,7 @@ class UpdateWithdrawMessage(BaseMessage):
         message = transaction_bytes[: -self.SIGNATURE_LENGTH]
 
         eth_signed_message = encode_defunct(message)
-        recovered_address = Web3.eth.account.recover_message(
+        recovered_address = Account.recover_message(
             eth_signed_message, signature=self.ecdsa_signature
         )
         ecdsa_verified = recovered_address == shield_address
