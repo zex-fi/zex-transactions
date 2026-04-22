@@ -1,6 +1,7 @@
+from enum import Enum
 from struct import calcsize, pack, unpack
 from struct import error as struct_error
-from typing import Any, ClassVar, Literal, Self
+from typing import Any, ClassVar, Self
 
 from coincurve import PrivateKey
 from eth_account import Account
@@ -20,10 +21,14 @@ from zex.utils.zex_types import ChainName, TransactionType
 curve = get_curve(curve="secp256k1")
 
 
-class Withdraw(BaseModel):
-    BYTES_FORMAT: ClassVar[str] = "> 1s Q {transaction_hash_length}s"
+class UpdateWithdrawMessageStatus(Enum):
+    REJECTED = ord("r")
+    SUCCESSFUL = ord("s")
 
-    status: Literal["r", "s"]
+
+class UpdatedWithdrawal(BaseModel):
+    BYTES_FORMAT: ClassVar[str] = "> Q {transaction_hash_length}s"
+
     id: int
     tx_hash: bytes
 
@@ -31,7 +36,6 @@ class Withdraw(BaseModel):
         try:
             return pack(
                 self.BYTES_FORMAT.format(transaction_hash_length=len(self.tx_hash)),
-                self.status.encode(),
                 self.id,
                 self.tx_hash,
             )
@@ -39,19 +43,19 @@ class Withdraw(BaseModel):
             raise MessageFormatError(f"Failed to pack withdraw: {e}") from e
 
     @classmethod
-    def from_bytes(cls, data: bytes, transaction_hash_length: int) -> Self:
+    def from_bytes(cls, data: bytes, transaction_hash_length: int) -> tuple[Self, int]:
         try:
-            status, id, tx_hash = unpack(
-                cls.BYTES_FORMAT.format(transaction_hash_length=transaction_hash_length), data
-            )
+            fmt = cls.BYTES_FORMAT.format(transaction_hash_length=transaction_hash_length)
+            size = calcsize(fmt)
+            id, tx_hash = unpack(fmt, data[:size])
+            return cls(id=id, tx_hash=tx_hash), size
         except struct_error as e:
             raise MessageFormatError(f"Failed to unpack withdraw: {e}") from e
-        return cls(status=status.decode(), id=id, tx_hash=tx_hash)
 
 
 class UpdateWithdrawMessage(BaseMessage):
     TRANSACTION_TYPE = TransactionType.UPDATE_WITHDRAW
-    HEADER_LENGTH = 8
+    HEADER_LENGTH = 9
     FROST_SIGNATURE_LENGTH = 65
     ECDSA_SIGNATURE_LENGTH = 65
     SIGNATURE_LENGTH = FROST_SIGNATURE_LENGTH + ECDSA_SIGNATURE_LENGTH
@@ -60,13 +64,15 @@ class UpdateWithdrawMessage(BaseMessage):
         self,
         version: int,
         chain: ChainName,
+        status: UpdateWithdrawMessageStatus,
         transaction_hash_length: int,
-        withdraws: list[Withdraw],
+        withdraws: list[UpdatedWithdrawal],
         frost_signature: bytes | None = None,
         ecdsa_signature: bytes | None = None,
     ) -> None:
         self.version = version
         self.chain = chain
+        self.status = status
 
         if frost_signature is not None and len(frost_signature) != self.FROST_SIGNATURE_LENGTH:
             raise ValueError("The length of given frost signature does not match.")
@@ -96,6 +102,7 @@ class UpdateWithdrawMessage(BaseMessage):
                 version,
                 command,
                 chain_bytes,
+                status_int,
                 transaction_hash_length,
                 withdraws_count,
             ) = unpack(header_format, header_bytes)
@@ -119,16 +126,23 @@ class UpdateWithdrawMessage(BaseMessage):
             withdraw_bytes = transaction_bytes[
                 cls.HEADER_LENGTH + index : cls.HEADER_LENGTH + index + body_size
             ]
-            withdraws.append(Withdraw.from_bytes(withdraw_bytes, transaction_hash_length))
+            withdraw, _ = UpdatedWithdrawal.from_bytes(withdraw_bytes, transaction_hash_length)
+            withdraws.append(withdraw)
 
         frost_signature, ecdsa_signature = unpack(
             cls.get_signature_format(),
             transaction_bytes[-cls.SIGNATURE_LENGTH :],
         )
 
+        try:
+            status = UpdateWithdrawMessageStatus(status_int)
+        except ValueError as e:
+            raise MessageFormatError(f"Invalid withdraw status: {status_int}") from e
+
         withdraw_message = cls(
             version=version,
             chain=ChainName.from_string(chain_bytes.decode("utf-8")),
+            status=status,
             transaction_hash_length=transaction_hash_length,
             withdraws=withdraws,
             frost_signature=frost_signature,
@@ -139,11 +153,13 @@ class UpdateWithdrawMessage(BaseMessage):
 
     @classmethod
     def get_header_format(cls) -> str:
-        return ">B B 3s B H"
+        return ">B B 3s B B H"
 
     @classmethod
     def get_body_format(cls, transaction_hash_length: int) -> str:
-        return Withdraw.BYTES_FORMAT.format(transaction_hash_length=transaction_hash_length)
+        return UpdatedWithdrawal.BYTES_FORMAT.format(
+            transaction_hash_length=transaction_hash_length
+        )
 
     @classmethod
     def get_signature_format(cls) -> str:
@@ -169,6 +185,7 @@ class UpdateWithdrawMessage(BaseMessage):
         return (
             f"version: {self.version},\n"
             f"chain: {self.chain.abbreviation},\n"
+            f"status: {self.status},\n"
             f"transaction_hash_length: {self.transaction_hash_length},\n"
             f"withdraws: {self.withdraws},\n"
             f"frost_signature: {self.frost_signature},\n"
@@ -206,6 +223,7 @@ class UpdateWithdrawMessage(BaseMessage):
             self.version,
             self.TRANSACTION_TYPE.value,
             self.chain.abbreviation.encode("utf-8"),
+            self.status.value,
             self.transaction_hash_length,
             len(self.withdraws),
         ]
