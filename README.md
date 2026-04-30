@@ -41,6 +41,16 @@ To verify the installation was successful and the shared libraries are correctly
 python3 -c "import zex; print('Successfully imported zex-transactions!')"
 ```
 
+### Bitcoin Network Configuration
+
+Before validating any BTC addresses, call `setup_btc_network` once at startup (defaults to testnet4):
+
+```python
+from zex.utils.zex_types import setup_btc_network
+
+setup_btc_network("testnet4")  # or "mainnet", "testnet", "signet", "regtest"
+```
+
 ---
 
 ### Troubleshooting

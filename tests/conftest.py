@@ -1,6 +1,12 @@
 import pytest
 from coincurve import PrivateKey, PublicKey
 from solders.keypair import Keypair
+from zex.utils.zex_types import setup_btc_network
+
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_bitcoinutils() -> None:
+    setup_btc_network("mainnet")
 
 
 @pytest.fixture

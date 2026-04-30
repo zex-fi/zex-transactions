@@ -1,7 +1,15 @@
 from dataclasses import dataclass
 from enum import Enum, StrEnum
+from typing import Literal
 
 import base58
+from bitcoinutils.keys import (
+    P2pkhAddress,
+    P2shAddress,
+    P2trAddress,
+    P2wpkhAddress,
+)
+from bitcoinutils.setup import setup as _btc_setup
 from eth_utils.address import to_checksum_address
 
 type UserPublic = bytes
@@ -80,6 +88,36 @@ class ChainInfo:
 
 class ChainNameInvalidValueError(Exception):
     "raise if inputs are not valid for converting types"
+
+
+type BtcNetwork = Literal["mainnet", "testnet", "testnet4", "signet", "regtest"]
+
+
+def setup_btc_network(network: BtcNetwork = "testnet4") -> None:
+    """Configure the Bitcoin network used for address validation.
+
+    Must be called before any BTC address is validated. Defaults to testnet4.
+    """
+    _btc_setup(network)
+
+
+def _validate_btc_address(address: str) -> None:
+    """Validate a BTC address against all supported script types.
+
+    Requires ``setup_btc_network()`` to have been called first; otherwise
+    validation silently uses testnet (the bitcoinutils default).
+    """
+
+    # P2wshAddress is excluded: its __init__ hardcodes address=None, so it never
+    # accepts an address string. All valid segwit v0 addresses (P2WPKH and P2WSH)
+    # pass P2wpkhAddress validation instead.
+    for cls in (P2pkhAddress, P2shAddress, P2wpkhAddress, P2trAddress):
+        try:
+            cls(address)
+            return  # valid — stop as soon as one class accepts it
+        except (ValueError, TypeError):
+            pass
+    raise ChainNameInvalidValueError(f"Invalid BTC address: {address}")
 
 
 class ChainName(Enum):
@@ -205,7 +243,10 @@ class ChainName(Enum):
                 case EncodingType.B58:
                     return base58.b58encode(address).decode("utf-8")
                 case EncodingType.UTF8:
-                    return address.decode("utf-8")
+                    str_address = address.decode("utf-8")
+                    if ChainName.Bitcoin == self:
+                        _validate_btc_address(str_address)
+                    return str_address
                 case _:
                     raise NotImplementedError(f"chain {self} is not supported")
         except (ValueError, TypeError, AttributeError) as e:
@@ -230,6 +271,8 @@ class ChainName(Enum):
             ) from e
 
     def address_to_bytes(self, address: str) -> bytes:
+        if self == ChainName.Bitcoin:
+            _validate_btc_address(address)
         return self._value_to_bytes(address, self.address_type)
 
     def tx_hash_to_str(self, tx_hash: bytes) -> str:
