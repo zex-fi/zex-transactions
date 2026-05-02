@@ -148,7 +148,8 @@ class TestAddressToBytes:
         assert ChainName.Solana.address_to_bytes(addr) == base58.b58decode(addr)
 
     def test_bitcoin_b58_address(self):
-        addr = "1A1zP1eP5QGefi2DMPTfTL5SLmv7Divf"
+        # Using a valid segwit address (P2WPKH)
+        addr = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"
         assert ChainName.Bitcoin.address_to_bytes(addr) == addr.encode()
 
     def test_invalid_hex_raises(self):
@@ -168,7 +169,8 @@ class TestAddressToStr:
         assert ChainName.Solana.address_to_str(raw) == addr
 
     def test_bitcoin_returns_b58_string(self):
-        addr = "1A1zP1eP5QGefi2DMPTfTL5SLmv7Divf"
+        # Using a valid segwit address (P2WPKH)
+        addr = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"
         raw = addr.encode()
         assert ChainName.Bitcoin.address_to_str(raw) == addr
 
@@ -204,3 +206,65 @@ class TestTxHashToStr:
     def test_solana_returns_b58(self):
         tx_bytes = b"\x01" * 32
         assert ChainName.Solana.tx_hash_to_str(tx_bytes) == base58.b58encode(tx_bytes).decode()
+
+
+class TestBitcoinAddressValidation:
+    """Test Bitcoin address validation for all supported script types."""
+
+    @pytest.mark.parametrize(
+        "addr",
+        [
+            # P2PKH — legacy, starts with 1
+            "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+            "1ADMYXTkuBE8EcdiWvCBvnxX4xsjFX9FSF",
+            # P2SH — starts with 3
+            "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy",
+            "3Ai1JZ8pdJb2ksieUV8FsxSNVJCpoPi8W6",
+            # P2WPKH / P2WSH — both start with bc1q; P2wshAddress cannot validate
+            # address strings (library limitation), so P2wpkhAddress covers both.
+            "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",
+            "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq",
+            "bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3",
+            # P2TR — taproot, starts with bc1p
+            "bc1p5d7rjq7g6rdk2yhzks9smlaqtedr4dekq08ge8ztwac72sfr9rusxg3297",
+        ],
+    )
+    def test_valid_address_accepted(self, addr):
+        result = ChainName.Bitcoin.address_to_bytes(addr)
+        assert result == addr.encode()
+
+    @pytest.mark.parametrize(
+        "addr",
+        [
+            "not_a_valid_address",
+            "bc1qinvalidchecksum",
+            "1InvalidAddress",
+            "",
+            "0x1A1zP1eP5QGefi2DMPTfTL5SLmv7Divf",
+        ],
+    )
+    def test_invalid_address_raises(self, addr):
+        with pytest.raises(ChainNameInvalidValueError):
+            ChainName.Bitcoin.address_to_bytes(addr)
+
+    @pytest.mark.parametrize(
+        "addr",
+        [
+            "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",
+            "bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3",
+            "bc1p5d7rjq7g6rdk2yhzks9smlaqtedr4dekq08ge8ztwac72sfr9rusxg3297",
+        ],
+    )
+    def test_address_to_str_valid(self, addr):
+        assert ChainName.Bitcoin.address_to_str(addr.encode()) == addr
+
+    @pytest.mark.parametrize(
+        "addr",
+        [
+            "invalid_bitcoin_address",
+            "bc1qinvalidchecksum",
+        ],
+    )
+    def test_address_to_str_invalid_raises(self, addr):
+        with pytest.raises(ChainNameInvalidValueError):
+            ChainName.Bitcoin.address_to_str(addr.encode())

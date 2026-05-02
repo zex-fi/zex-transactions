@@ -1,6 +1,6 @@
 [project]
 name = "zex-transactions"
-version = "0.4.0"
+version = "0.4.1"
 description = "ZEX transaction encoding, signing, and validation logic"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
@@ -8,6 +8,7 @@ license = "CC0-1.0"
 
 dependencies = [
     "base58>=2.1.1",
+    "bitcoin-utils~=0.7.1",
     "coincurve~=20.0.0",
     "eth-account>=0.13.7",
     "eth-hash>=0.7.1",
