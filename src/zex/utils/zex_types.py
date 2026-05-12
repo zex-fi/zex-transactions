@@ -47,6 +47,8 @@ class TransactionType(Enum):
     TRANSFER = ord("t")
     PAUSE = ord("p")
     UPDATE_WITHDRAW = ord("u")
+    ADD_PUBLIC_KEY = ord("a")
+    REMOVE_PUBLIC_KEY = ord("k")
 
 
 class SignatureType(Enum):

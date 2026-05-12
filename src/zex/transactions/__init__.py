@@ -1,3 +1,6 @@
+from .add_public_key_message import AddPublicKeyMessage as AddPublicKeyMessage
+from .add_public_key_message import AddPublicKeySchema as AddPublicKeySchema
+from .add_public_key_message import KeyMode as KeyMode
 from .base_message import BaseMessage as BaseMessage
 from .buy_message import BuyMessage as BuyMessage
 from .buy_message import BuySchema as BuySchema
@@ -13,6 +16,8 @@ from .order_message import OrderMessage as OrderMessage
 from .pause_withdraw_message import PauseWithdrawMessage as PauseWithdrawMessage
 from .register_message import RegisterMessage as RegisterMessage
 from .register_message import RegisterSchema as RegisterSchema
+from .remove_public_key_message import RemovePublicKeyMessage as RemovePublicKeyMessage
+from .remove_public_key_message import RemovePublicKeySchema as RemovePublicKeySchema
 from .sell_message import SellMessage as SellMessage
 from .sell_message import SellSchema as SellSchema
 from .transfer_message import TransferMessage as TransferMessage
