@@ -60,16 +60,6 @@ setup_btc_network("testnet4")  # or "mainnet", "testnet", "signet", "regtest"
 
 ---
 
-### Troubleshooting
-
-**Error: `fatal error: Python.h: No such file or directory`**
-You are missing the Python development headers required to build C extensions.
-
-- **Ubuntu:** `sudo apt-get install python3-dev`
-- **Fedora:** `sudo dnf install python3-devel`
-
----
-
 ## Getting Started
 
 `zex-transactions` handles encoding, signing, and decoding of ZEX exchange transactions as compact binary messages. Each transaction type maps to a message class with `to_bytes()` / `from_bytes()` for serialization and `sign()` / `verify_signature()` for cryptographic operations.
@@ -77,6 +67,7 @@ You are missing the Python development headers required to build C extensions.
 ### Core Concepts
 
 **Signature types** — every message requires one:
+
 - `SignatureType.SECP256K1` — Ethereum/Bitcoin-style keys (33-byte compressed public key)
 - `SignatureType.ED25519` — Solana-style keys (32-byte public key)
 
@@ -172,8 +163,11 @@ Replace `BuyMessage` with `SellMessage` for a sell order — the interface is id
 ### Cancel an Order
 
 ```python
+from coincurve import PrivateKey
 from zex.transactions import CancelMessage
 from zex.utils.zex_types import SignatureType
+
+private_key = PrivateKey()
 
 msg = CancelMessage(
     version=1,
@@ -191,11 +185,13 @@ msg.sign(private_key)
 
 ```python
 from decimal import Decimal
+from coincurve import PrivateKey
 from zex.transactions import WithdrawMessage
 from zex.utils.numbers import to_scientific
 from zex.utils.zex_types import ChainName, SignatureType
 import time
 
+private_key = PrivateKey()
 chain = ChainName.Ethereum
 destination = "0xAbCd..."  # checksummed EVM address
 
@@ -223,11 +219,13 @@ msg.sign(private_key)
 
 ```python
 from decimal import Decimal
+from coincurve import PrivateKey
 from zex.transactions import TransferMessage
 from zex.utils.numbers import to_scientific
 from zex.utils.zex_types import SignatureType
 import time
 
+private_key = PrivateKey()
 mantissa, exponent = to_scientific(Decimal("10"))
 
 msg = TransferMessage(
@@ -252,15 +250,12 @@ msg.sign(private_key)
 Every message class supports round-trip binary encoding:
 
 ```python
+from zex.transactions import BaseMessage
+
 # Encode
 raw: bytes = msg.to_bytes()
 
-# Decode — automatically detects transaction type
-from zex.transactions import BuyMessage
-decoded = BuyMessage.from_bytes(raw)
-
-# Or dispatch without knowing the type in advance
-from zex.transactions import BaseMessage
+# Decode — dispatches to the correct subclass based on the transaction type byte
 decoded = BaseMessage.from_bytes(raw)
 ```
 
@@ -268,8 +263,23 @@ decoded = BaseMessage.from_bytes(raw)
 
 ### Verify a Signature
 
+**SECP256K1:**
+
 ```python
-public_key_bytes = private_key.public_key.format(compressed=True)
+from coincurve import PrivateKey
+
+private_key = PrivateKey()
+public_key_bytes = private_key.public_key.format(compressed=True)  # 33 bytes
+is_valid = msg.verify_signature(public_key_bytes)
+```
+
+**ED25519 (Solana):**
+
+```python
+from solders.keypair import Keypair
+
+keypair = Keypair()
+public_key_bytes = bytes(keypair.pubkey())  # 32 bytes
 is_valid = msg.verify_signature(public_key_bytes)
 ```
 
@@ -298,27 +308,3 @@ buy_msg = schema.to_message()
 ```
 
 Available schemas: `RegisterSchema`, `BuySchema`, `SellSchema`, `WithdrawSchema`, `TransferSchema`, `CancelSchema`
-
----
-
-### Error Handling
-
-```python
-from zex.transactions import (
-    HeaderFormatError,
-    MessageFormatError,
-    MessageValidationError,
-    UnexpectedCommandError,
-)
-
-try:
-    msg = BuyMessage.from_bytes(raw_bytes)
-except HeaderFormatError:
-    ...  # bad header / too short
-except UnexpectedCommandError:
-    ...  # wrong transaction type byte
-except MessageFormatError:
-    ...  # body is malformed
-except MessageValidationError:
-    ...  # values out of range (e.g. exponent too small)
-```
