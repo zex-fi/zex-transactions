@@ -84,10 +84,7 @@ class AddPublicKeyMessage(BaseMessage):
 
     @classmethod
     def get_body_format(cls, key_identifier_length: int, public_key_length: int) -> str:
-        return (
-            f">{key_identifier_length}s {public_key_length}s"
-            f" B I I I Q {cls.SIGNATURE_LENGTH}s"
-        )
+        return f">{key_identifier_length}s {public_key_length}s B I I I Q {cls.SIGNATURE_LENGTH}s"
 
     @classmethod
     def get_format(cls, key_identifier_length: int, public_key_length: int) -> str:
