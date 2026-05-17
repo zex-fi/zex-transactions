@@ -33,17 +33,6 @@ class RemovePublicKeySchema(BaseModel):
 
 
 class RemovePublicKeyMessage(BaseMessage):
-    """Remove a secondary public key from a user account.
-
-    Identifies the key to remove by its key_identifier. This message must be
-    signed by the account's master key.
-
-    Wire format
-    -----------
-    Header (4 bytes):  version | command='k' | signature_type | key_identifier_length
-    Body:              key_identifier | time | nonce | user_id | signature
-    """
-
     TRANSACTION_TYPE = TransactionType.REMOVE_PUBLIC_KEY
     HEADER_LENGTH = 4
 

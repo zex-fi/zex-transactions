@@ -47,21 +47,6 @@ class AddPublicKeySchema(BaseModel):
 
 
 class AddPublicKeyMessage(BaseMessage):
-    """Add a secondary public key to an existing user account.
-
-    Named keys (KeyMode.NAMED) are permanent until explicitly removed.
-    Unnamed keys (KeyMode.UNNAMED) expire at the given Unix timestamp (expiry).
-    The key_identifier labels the key so users can reference it when signing
-    transactions with the secondary key.
-
-    This message must be signed by the account's master key.
-
-    Wire format
-    -----------
-    Header (5 bytes):  version | command='a' | signature_type | key_signature_type | key_identifier_length
-    Body:              key_identifier | public_key | key_mode | expiry | time | nonce | user_id | signature
-    """
-
     TRANSACTION_TYPE = TransactionType.ADD_PUBLIC_KEY
     HEADER_LENGTH = 5
 
