@@ -295,26 +295,4 @@ is_valid = msg.verify_signature(public_key_bytes)
 
 ---
 
-### Schema Helpers (Pydantic)
-
-Each transaction type ships a `*Schema` model for deserializing JSON payloads (e.g., from an API):
-
-```python
-from zex.transactions import BuySchema
-from zex.utils.zex_types import SignatureType
-
-schema = BuySchema(
-    sig_type=SignatureType.SECP256K1,
-    base_token="BTC",
-    quote_token="USDT",
-    amount="1.5",
-    price="65000",
-    t=1700000000,
-    nonce=1,
-    user_id=42,
-    signature="deadbeef...",
-)
-buy_msg = schema.to_message()
-```
-
 Available schemas: `RegisterSchema`, `BuySchema`, `SellSchema`, `WithdrawSchema`, `TransferSchema`, `CancelSchema`
