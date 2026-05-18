@@ -73,6 +73,8 @@ setup_btc_network("testnet4")  # or "mainnet", "testnet", "signet", "regtest"
 
 **Amount encoding** — amounts use scientific notation: `amount = mantissa × 10^exponent`. Use `to_scientific()` to convert a `Decimal`:
 
+This package relies on the decimal module. If you are working with high-precision values, ensure the precision is configured (e.g., via decimal.getcontext().prec or decimal.setcontext()) to avoid truncation during calculations.
+
 ```python
 from decimal import Decimal
 from zex.utils.numbers import to_scientific
@@ -122,6 +124,7 @@ msg = RegisterMessage(
     public_key=bytes(keypair.pubkey()),  # 32 bytes
     signature_hex=None,
 )
+
 msg.sign(keypair)
 ```
 
@@ -131,10 +134,13 @@ msg.sign(keypair)
 
 ```python
 from decimal import Decimal
+from coincurve import PrivateKey
 from zex.transactions import BuyMessage, SellMessage
 from zex.utils.numbers import to_scientific
 from zex.utils.zex_types import SignatureType
 import time
+
+private_key = PrivateKey()
 
 amount_mantissa, amount_exponent = to_scientific(Decimal("1.5"))    # 1.5 BTC
 price_mantissa, price_exponent   = to_scientific(Decimal("65000"))  # at $65,000
@@ -250,12 +256,16 @@ msg.sign(private_key)
 Every message class supports round-trip binary encoding:
 
 ```python
-from zex.transactions import BaseMessage
+from zex.transactions import BaseMessage, BuyMessage
 
 # Encode
 raw: bytes = msg.to_bytes()
 
-# Decode — dispatches to the correct subclass based on the transaction type byte
+# Decode as a specific known type
+decoded = BuyMessage.from_bytes(raw)
+
+# Or auto-dispatch without knowing the type in advance — BaseMessage inspects
+# the transaction type byte and delegates to the correct subclass
 decoded = BaseMessage.from_bytes(raw)
 ```
 
