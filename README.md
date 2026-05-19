@@ -106,6 +106,7 @@ msg = RegisterMessage(
 msg.sign(private_key)
 
 transaction_bytes = msg.to_bytes()
+transaction_hex = msg.signature_hex
 ```
 
 For ED25519 (Solana):
@@ -199,7 +200,7 @@ import time
 
 private_key = PrivateKey()
 chain = ChainName.Ethereum
-destination = "0xAbCd..."  # checksummed EVM address
+destination = "0x9858EfFD232B4033E47d90003D41EC34EcaEda94"  # checksummed EVM address
 
 mantissa, exponent = to_scientific(Decimal("0.5"))
 
@@ -296,3 +297,17 @@ is_valid = msg.verify_signature(public_key_bytes)
 ---
 
 Available schemas: `RegisterSchema`, `BuySchema`, `SellSchema`, `WithdrawSchema`, `TransferSchema`, `CancelSchema`
+
+---
+
+### Available Messages
+
+| Message           | Purpose                                                          |
+| ----------------- | ---------------------------------------------------------------- |
+| `RegisterMessage` | Register a new user with a public key and optional referral code |
+| `BuyMessage`      | Place a buy order on a base/quote pair                           |
+| `SellMessage`     | Place a sell order on a base/quote pair                          |
+| `CancelMessage`   | Cancel a previously placed order by nonce                        |
+| `WithdrawMessage` | Withdraw funds to an external on-chain address                   |
+| `TransferMessage` | Internal transfer between ZEX users                              |
+| `OrderMessage`    | Shared base for `BuyMessage` / `SellMessage`                     |
