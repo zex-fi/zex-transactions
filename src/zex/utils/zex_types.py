@@ -47,6 +47,7 @@ class TransactionType(Enum):
     TRANSFER = ord("t")
     PAUSE = ord("p")
     UPDATE_WITHDRAW = ord("u")
+    LOGIN = ord("l")
 
 
 class SignatureType(Enum):
