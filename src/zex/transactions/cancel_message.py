@@ -80,9 +80,14 @@ class CancelMessage(BaseMessage):
 
         signature = signature_bytes.hex()
 
+        try:
+            sig_type = SignatureType.from_int(signature_type)
+        except ValueError as e:
+            raise MessageFormatError(f"Invalid signature type: {e}") from e
+
         cancel_message = cls(
             version=version,
-            signature_type=SignatureType.from_int(signature_type),
+            signature_type=sig_type,
             order_nonce=order_nonce,
             user_id=user_id,
             signature_hex=signature,

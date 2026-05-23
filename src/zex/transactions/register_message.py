@@ -66,13 +66,16 @@ class RegisterMessage(BaseMessage):
         if command != cls.TRANSACTION_TYPE.value:
             raise UnexpectedCommandError("Unexpected command.")
 
-        sig_type = SignatureType.from_int(signature_type)
+        try:
+            sig_type = SignatureType.from_int(signature_type)
+        except ValueError as e:
+            raise MessageFormatError(f"Invalid signature type: {e}") from e
         if sig_type == SignatureType.SECP256K1:
             public_key_length = 33
         elif sig_type == SignatureType.ED25519:
             public_key_length = 32
         else:
-            raise ValueError("Unknown signature type.")
+            raise MessageFormatError(f"Unsupported signature type: {sig_type}.")
         body_format = cls.get_body_format(referral_code_length, public_key_length)
         body_size = calcsize(body_format)
         if len(transaction_bytes) - cls.HEADER_LENGTH < body_size:

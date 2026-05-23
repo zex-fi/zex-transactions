@@ -92,8 +92,13 @@ class LoginMessage(BaseMessage):
         if command != cls.TRANSACTION_TYPE.value:
             raise UnexpectedCommandError("Unexpected command.")
 
-        sig_type = SignatureType.from_int(signature_type)
-        public_key_length = _PUBLIC_KEY_LENGTHS[sig_type]
+        try:
+            sig_type = SignatureType.from_int(signature_type)
+        except ValueError as e:
+            raise MessageFormatError(f"Invalid signature type: {e}") from e
+        public_key_length = _PUBLIC_KEY_LENGTHS.get(sig_type)
+        if public_key_length is None:
+            raise MessageFormatError(f"Unsupported signature type: {sig_type}.")
 
         body_format = cls.get_body_format(public_key_length)
         body_size = calcsize(body_format)
@@ -128,7 +133,7 @@ class LoginMessage(BaseMessage):
 
     @classmethod
     def get_body_format(cls, public_key_length: int) -> str:
-        return f">{public_key_length}s Q {LoginMessage.HMAC_LENGTH}s {cls.SIGNATURE_LENGTH}s"
+        return f">{public_key_length}s Q {cls.HMAC_LENGTH}s {cls.SIGNATURE_LENGTH}s"
 
     @classmethod
     def get_format(cls, public_key_length: int) -> str:
