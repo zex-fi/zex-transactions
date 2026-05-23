@@ -35,7 +35,7 @@ class WithdrawMessage(BaseMessage):
         amount_exponent: int,
         destination_wallet: bytes,
         time: int,
-        nonce: int,
+        nonce: int | None,
         user_id: int,
         signature_hex: str | None = None,
     ) -> None:
@@ -50,8 +50,11 @@ class WithdrawMessage(BaseMessage):
         self.version = version
         self.token_name = token_name
         self.time = time
-        self.nonce = nonce
+        self._nonce = nonce
         self.user_id = user_id
+
+        if version == 1 and nonce is None:
+            raise MessageValidationError("nonce is required for v1 messages.")
 
         self._transaction_bytes: bytes | None = None
 
@@ -62,10 +65,13 @@ class WithdrawMessage(BaseMessage):
             )
 
     @property
+    def nonce(self) -> int:
+        if self._nonce is None:
+            raise AttributeError("nonce is not available in v2 messages; use time instead.")
+        return self._nonce
+
+    @property
     def amount(self) -> int:
-        # NOTE The way the amount is stored in withdraw, deposit, and user balance
-        # makes us add the additional exponent. This logic is spreaded throughout
-        # the code and should be refactored.
         return self.amount_mantissa * 10 ** (
             self.amount_exponent + WithdrawMessage.ADDITIONAL_EXPONENT
         )
@@ -93,26 +99,42 @@ class WithdrawMessage(BaseMessage):
         if destination_wallet_length == 0:
             raise MessageFormatError("Invalid destination address length.")
 
-        body_format = cls.get_body_format(token_length, destination_wallet_length)
+        body_format = cls.get_body_format(token_length, destination_wallet_length, version)
         body_size = calcsize(body_format)
         if len(transaction_bytes) - cls.HEADER_LENGTH < body_size:
             raise MessageFormatError("Transaction body is too short.")
         body_bytes = transaction_bytes[cls.HEADER_LENGTH : cls.HEADER_LENGTH + body_size]
 
-        try:
-            (
-                token_chain_bytes,
-                token_name_bytes,
-                amount_mantissa,
-                amount_exponent,
-                destination_wallet,
-                time,
-                nonce,
-                user_id,
-                signature_bytes,
-            ) = unpack(body_format, body_bytes)
-        except struct_error as e:
-            raise MessageFormatError(f"Failed to unpack body: {e}") from e
+        if version == 1:
+            try:
+                (
+                    token_chain_bytes,
+                    token_name_bytes,
+                    amount_mantissa,
+                    amount_exponent,
+                    destination_wallet,
+                    time,
+                    nonce,
+                    user_id,
+                    signature_bytes,
+                ) = unpack(body_format, body_bytes)
+            except struct_error as e:
+                raise MessageFormatError(f"Failed to unpack body: {e}") from e
+        else:  # v2
+            try:
+                (
+                    token_chain_bytes,
+                    token_name_bytes,
+                    amount_mantissa,
+                    amount_exponent,
+                    destination_wallet,
+                    time,
+                    user_id,
+                    signature_bytes,
+                ) = unpack(body_format, body_bytes)
+            except struct_error as e:
+                raise MessageFormatError(f"Failed to unpack body: {e}") from e
+            nonce = None
 
         chain_name = ChainName.from_string(token_chain_bytes.decode("ascii"))
         token_name = token_name_bytes.decode("ascii")
@@ -138,15 +160,20 @@ class WithdrawMessage(BaseMessage):
         return ">BBBBI"
 
     @classmethod
-    def get_body_format(cls, token_length: int, destination_wallet_length: int) -> str:
-        # Token chain's length is hard-coded as 3.
+    def get_body_format(
+        cls, token_length: int, destination_wallet_length: int, version: int = 1
+    ) -> str:
+        if version == 2:
+            return (
+                f">3s {token_length}s Q b {destination_wallet_length}s I Q {cls.SIGNATURE_LENGTH}s"
+            )
         return f">3s {token_length}s Q b {destination_wallet_length}s I I Q {cls.SIGNATURE_LENGTH}s"
 
     @classmethod
-    def get_format(cls, token_length: int, destination_wallet_length: int) -> str:
+    def get_format(cls, token_length: int, destination_wallet_length: int, version: int = 1) -> str:
         return (
             cls.get_header_format()
-            + cls.get_body_format(token_length, destination_wallet_length)[1:]
+            + cls.get_body_format(token_length, destination_wallet_length, version)[1:]
         )
 
     def __str__(self) -> str:
@@ -155,43 +182,67 @@ class WithdrawMessage(BaseMessage):
             destination_str = self.chain.address_to_str(self.destination_wallet)
         except ChainNameInvalidValueError as e:
             raise MessageFormatError("destination_wallet is not valid") from e
-        return (
-            f"v: {self.version}\n"
-            "name: withdraw\n"
-            f"token chain: {self.chain.abbreviation}\n"
-            f"token name: {self.token_name}\n"
-            f"amount: {amount}\n"
-            f"to: {destination_str}\n"
-            f"t: {self.time}\n"
-            f"nonce: {self.nonce}\n"
-            f"user_id: {self.user_id}\n"
-        )
+        parts = [
+            f"v: {self.version}",
+            "name: withdraw",
+            f"token chain: {self.chain.abbreviation}",
+            f"token name: {self.token_name}",
+            f"amount: {amount}",
+            f"to: {destination_str}",
+            f"t: {self.time}",
+        ]
+        if self.version == 1:
+            parts.append(f"nonce: {self._nonce}")
+        parts.append(f"user_id: {self.user_id}")
+        return "\n".join(parts) + "\n"
 
     def to_bytes(self) -> bytes:
         if self._transaction_bytes is not None:
             return self._transaction_bytes
         assert self.signature_hex is not None
-        transaction_bytes = pack(
-            WithdrawMessage.get_format(
-                token_length=len(self.token_name),
-                destination_wallet_length=len(self.destination_wallet),
-            ),
-            #
-            self.version,
-            WithdrawMessage.TRANSACTION_TYPE.value,
-            self.signature_type.value,
-            len(self.token_name),
-            len(self.destination_wallet),
-            self.chain.abbreviation.encode("ascii"),
-            self.token_name.encode("ascii"),
-            self.amount_mantissa,
-            self.amount_exponent,
-            self.destination_wallet,
-            self.time,
-            self.nonce,
-            self.user_id,
-            bytes.fromhex(self.signature_hex),
-        )
+        if self.version == 1:
+            transaction_bytes = pack(
+                WithdrawMessage.get_format(
+                    token_length=len(self.token_name),
+                    destination_wallet_length=len(self.destination_wallet),
+                    version=1,
+                ),
+                self.version,
+                WithdrawMessage.TRANSACTION_TYPE.value,
+                self.signature_type.value,
+                len(self.token_name),
+                len(self.destination_wallet),
+                self.chain.abbreviation.encode("ascii"),
+                self.token_name.encode("ascii"),
+                self.amount_mantissa,
+                self.amount_exponent,
+                self.destination_wallet,
+                self.time,
+                self._nonce,
+                self.user_id,
+                bytes.fromhex(self.signature_hex),
+            )
+        else:  # version == 2
+            transaction_bytes = pack(
+                WithdrawMessage.get_format(
+                    token_length=len(self.token_name),
+                    destination_wallet_length=len(self.destination_wallet),
+                    version=2,
+                ),
+                self.version,
+                WithdrawMessage.TRANSACTION_TYPE.value,
+                self.signature_type.value,
+                len(self.token_name),
+                len(self.destination_wallet),
+                self.chain.abbreviation.encode("ascii"),
+                self.token_name.encode("ascii"),
+                self.amount_mantissa,
+                self.amount_exponent,
+                self.destination_wallet,
+                self.time,
+                self.user_id,
+                bytes.fromhex(self.signature_hex),
+            )
         self._transaction_bytes = transaction_bytes
         return transaction_bytes
 
