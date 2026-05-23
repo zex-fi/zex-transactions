@@ -7,60 +7,86 @@ from zex.transactions.base_message import BaseMessage
 from zex.transactions.exceptions import (
     HeaderFormatError,
     MessageFormatError,
+    MessageValidationError,
     UnexpectedCommandError,
 )
 from zex.utils.zex_types import SignatureType, TransactionType
 
+_PUBLIC_KEY_LENGTHS = {
+    SignatureType.SECP256K1: 33,
+    SignatureType.ED25519: 32,
+}
 
-class RegisterSchema(BaseModel):
+
+class LoginSchema(BaseModel):
     sig_type: SignatureType
-    referral_code: str
     public_key: bytes
+    timestamp: int
+    hmac: bytes
     signature: str
 
-    def to_message(self) -> "RegisterMessage":
-        return RegisterMessage(
+    def to_message(self) -> "LoginMessage":
+        return LoginMessage(
             version=1,
             signature_type=self.sig_type,
-            referral_code=self.referral_code,
             public_key=self.public_key,
+            timestamp=self.timestamp,
+            hmac=self.hmac,
             signature_hex=self.signature,
         )
 
 
-class RegisterMessage(BaseMessage):
-    TRANSACTION_TYPE = TransactionType.REGISTER
-    HEADER_LENGTH = 4
+class LoginMessage(BaseMessage):
+    TRANSACTION_TYPE = TransactionType.LOGIN
+    HEADER_LENGTH = 3
+    HMAC_LENGTH = 32
 
     def __init__(
         self,
         version: int,
         signature_type: SignatureType,
-        referral_code: str,
         public_key: bytes,
+        timestamp: int,
+        hmac: bytes,
         signature_hex: str | None = None,
     ) -> None:
         self.user_id = -1
 
-        self.referral_code = referral_code
-        self.public_key = public_key
-        self.signature_type = signature_type
         self.version = version
+        self.signature_type = signature_type
+
+        expected_pk_length = _PUBLIC_KEY_LENGTHS.get(signature_type)
+        if expected_pk_length is None:
+            raise MessageValidationError("Unknown signature type.")
+        if len(public_key) != expected_pk_length:
+            raise MessageValidationError(
+                f"public_key must be {expected_pk_length} bytes for "
+                f"{signature_type.name}, got {len(public_key)}."
+            )
+        self.public_key = public_key
+
+        if not 0 <= timestamp < 2**64:
+            raise MessageValidationError("timestamp must fit in a u64.")
+        self.timestamp = timestamp
+
+        if len(hmac) != LoginMessage.HMAC_LENGTH:
+            raise MessageValidationError(
+                f"hmac must be {LoginMessage.HMAC_LENGTH} bytes, got {len(hmac)}."
+            )
+        self.hmac = hmac
+
         self.validate_signature(signature_hex)
         self.signature_hex = signature_hex
 
         self._transaction_bytes: bytes | None = None
 
     @classmethod
-    def from_bytes(cls, transaction_bytes: bytes) -> "RegisterMessage":
+    def from_bytes(cls, transaction_bytes: bytes) -> "LoginMessage":
         if len(transaction_bytes) < cls.HEADER_LENGTH:
             raise HeaderFormatError("Transaction is too short for header.")
         header_bytes = transaction_bytes[: cls.HEADER_LENGTH]
-        header_format = cls.get_header_format()
         try:
-            version, command, signature_type, referral_code_length = unpack(
-                header_format, header_bytes
-            )
+            version, command, signature_type = unpack(cls.get_header_format(), header_bytes)
         except struct_error as e:
             raise HeaderFormatError(f"Failed to unpack header: {e}") from e
         if command != cls.TRANSACTION_TYPE.value:
@@ -70,13 +96,11 @@ class RegisterMessage(BaseMessage):
             sig_type = SignatureType.from_int(signature_type)
         except ValueError as e:
             raise MessageFormatError(f"Invalid signature type: {e}") from e
-        if sig_type == SignatureType.SECP256K1:
-            public_key_length = 33
-        elif sig_type == SignatureType.ED25519:
-            public_key_length = 32
-        else:
+        public_key_length = _PUBLIC_KEY_LENGTHS.get(sig_type)
+        if public_key_length is None:
             raise MessageFormatError(f"Unsupported signature type: {sig_type}.")
-        body_format = cls.get_body_format(referral_code_length, public_key_length)
+
+        body_format = cls.get_body_format(public_key_length)
         body_size = calcsize(body_format)
         if len(transaction_bytes) - cls.HEADER_LENGTH < body_size:
             raise MessageFormatError("Transaction body is too short.")
@@ -84,59 +108,59 @@ class RegisterMessage(BaseMessage):
 
         try:
             (
-                referral_code,
                 public_key,
+                timestamp,
+                hmac,
                 signature_bytes,
             ) = unpack(body_format, body_bytes)
         except struct_error as e:
             raise MessageFormatError(f"Failed to unpack body: {e}") from e
 
-        register_message = cls(
+        login_message = cls(
             version=version,
             signature_type=sig_type,
-            referral_code=referral_code.decode("ascii"),
             public_key=public_key,
+            timestamp=timestamp,
+            hmac=hmac,
             signature_hex=signature_bytes.hex(),
         )
-        register_message._transaction_bytes = transaction_bytes
-        return register_message
+        login_message._transaction_bytes = transaction_bytes
+        return login_message
 
     @classmethod
     def get_header_format(cls) -> str:
-        return ">BBBB"
+        return ">BBB"
 
     @classmethod
-    def get_body_format(cls, referral_code_length: int, public_key_length: int) -> str:
-        return f">{referral_code_length}s {public_key_length}s {cls.SIGNATURE_LENGTH}s"
+    def get_body_format(cls, public_key_length: int) -> str:
+        return f">{public_key_length}s Q {cls.HMAC_LENGTH}s {cls.SIGNATURE_LENGTH}s"
 
     @classmethod
-    def get_format(cls, referral_code_length: int, public_key_length: int) -> str:
-        return (
-            cls.get_header_format()
-            + cls.get_body_format(referral_code_length, public_key_length)[1:]
-        )
+    def get_format(cls, public_key_length: int) -> str:
+        return cls.get_header_format() + cls.get_body_format(public_key_length)[1:]
 
     def __str__(self) -> str:
-        if self.referral_code:
-            return f"Welcome to ZEX.\nReferral code: {self.referral_code}"
-        return "Welcome to ZEX."
+        return (
+            f"v: {self.version}\n"
+            "name: login\n"
+            f"public_key: {self.public_key.hex()}\n"
+            f"t: {self.timestamp}\n"
+            f"hmac: {self.hmac.hex()}\n"
+        )
 
     def to_bytes(self) -> bytes:
         if self._transaction_bytes is not None:
             return self._transaction_bytes
         assert self.signature_hex is not None
         transaction_bytes = pack(
-            RegisterMessage.get_format(
-                referral_code_length=len(self.referral_code),
-                public_key_length=len(self.public_key),
-            ),
+            LoginMessage.get_format(public_key_length=len(self.public_key)),
             #
             self.version,
-            RegisterMessage.TRANSACTION_TYPE.value,
+            LoginMessage.TRANSACTION_TYPE.value,
             self.signature_type.value,
-            len(self.referral_code),
-            self.referral_code.encode("ascii"),
             self.public_key,
+            self.timestamp,
+            self.hmac,
             bytes.fromhex(self.signature_hex),
         )
         self._transaction_bytes = transaction_bytes

@@ -75,9 +75,14 @@ class PauseWithdrawMessage(BaseMessage):
         if is_set not in (0, 1):
             raise MessageFormatError("Incorrect value for is_set argument.")
 
+        try:
+            sig_type = SignatureType.from_int(signature_type)
+        except ValueError as e:
+            raise MessageFormatError(f"Invalid signature type: {e}") from e
+
         pause_withdraw_message = cls(
             version=version,
-            signature_type=SignatureType.from_int(signature_type),
+            signature_type=sig_type,
             is_set=bool(is_set),
             time=time,
             nonce=nonce,

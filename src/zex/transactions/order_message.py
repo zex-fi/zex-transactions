@@ -123,9 +123,14 @@ class OrderMessage(BaseMessage):
         quote_token = quote_token_bytes.decode("ascii")
         signature = signature_bytes.hex()
 
+        try:
+            sig_type = SignatureType.from_int(signature_type)
+        except ValueError as e:
+            raise MessageFormatError(f"Invalid signature type: {e}") from e
+
         order_message = cls(
             version=version,
-            signature_type=SignatureType.from_int(signature_type),
+            signature_type=sig_type,
             base_token=base_token,
             quote_token=quote_token,
             amount_mantissa=amount_mantissa,
