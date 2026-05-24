@@ -39,6 +39,9 @@ class WithdrawMessage(BaseMessage):
         user_id: int,
         signature_hex: str | None = None,
     ) -> None:
+        if version not in (1, 2):
+            raise MessageValidationError("Unsupported version.")
+
         self.destination_wallet = destination_wallet
         self.signature_type = signature_type
         self.validate_signature(signature_hex)

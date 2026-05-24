@@ -65,6 +65,9 @@ class TransferMessage(BaseMessage):
         user_id: int,
         signature_hex: str | None = None,
     ) -> None:
+        if version not in (1, 2):
+            raise MessageValidationError("Unsupported version.")
+
         self.version = version
         self.signature_type = signature_type
         self.validate_signature(signature_hex)

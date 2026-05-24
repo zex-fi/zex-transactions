@@ -1,4 +1,3 @@
-import pytest
 from coincurve import PrivateKey
 from solders.keypair import Keypair
 
@@ -6,7 +5,7 @@ from zex.transactions import AddPublicKeyMessage, BaseMessage, KeyMode
 from zex.utils.zex_types import SignatureType
 
 
-def _make_named(
+def _make_permanent(
     dummy_signature_hex: str,
     dummy_public_key_secp256k1: bytes,
 ) -> AddPublicKeyMessage:
@@ -15,8 +14,8 @@ def _make_named(
         signature_type=SignatureType.SECP256K1,
         key_signature_type=SignatureType.SECP256K1,
         key_identifier=1,
-        key_mode=KeyMode.NAMED,
-        expiry=0,
+        key_mode=KeyMode.PERMANENT,
+        expiry=None,
         public_key=dummy_public_key_secp256k1,
         nonce=1,
         time=1_000_000,
@@ -25,10 +24,10 @@ def _make_named(
     )
 
 
-def test_named_key_round_trip(
+def test_permanent_key_round_trip(
     dummy_signature_hex: str, dummy_public_key_secp256k1: bytes
 ) -> None:
-    original = _make_named(dummy_signature_hex, dummy_public_key_secp256k1)
+    original = _make_permanent(dummy_signature_hex, dummy_public_key_secp256k1)
 
     reconstructed = AddPublicKeyMessage.from_bytes(original.to_bytes())
 
@@ -37,7 +36,7 @@ def test_named_key_round_trip(
     assert reconstructed.key_signature_type == original.key_signature_type
     assert reconstructed.key_identifier == original.key_identifier
     assert reconstructed.key_mode == original.key_mode
-    assert reconstructed.expiry == original.expiry
+    assert reconstructed.expiry is None
     assert reconstructed.public_key == original.public_key
     assert reconstructed.nonce == original.nonce
     assert reconstructed.time == original.time
@@ -45,7 +44,7 @@ def test_named_key_round_trip(
     assert reconstructed.signature_hex == original.signature_hex
 
 
-def test_unnamed_key_round_trip(
+def test_temporary_key_round_trip(
     dummy_signature_hex: str, dummy_public_key_secp256k1: bytes
 ) -> None:
     original = AddPublicKeyMessage(
@@ -53,7 +52,7 @@ def test_unnamed_key_round_trip(
         signature_type=SignatureType.SECP256K1,
         key_signature_type=SignatureType.SECP256K1,
         key_identifier=99,
-        key_mode=KeyMode.UNNAMED,
+        key_mode=KeyMode.TEMPORARY,
         expiry=1_800_000_000,
         public_key=dummy_public_key_secp256k1,
         nonce=99,
@@ -64,7 +63,7 @@ def test_unnamed_key_round_trip(
 
     reconstructed = AddPublicKeyMessage.from_bytes(original.to_bytes())
 
-    assert reconstructed.key_mode == KeyMode.UNNAMED
+    assert reconstructed.key_mode == KeyMode.TEMPORARY
     assert reconstructed.expiry == 1_800_000_000
     assert reconstructed.key_identifier == 99
     assert reconstructed.user_id == 7
@@ -79,8 +78,8 @@ def test_ed25519_secondary_key_round_trip(
         signature_type=SignatureType.SECP256K1,
         key_signature_type=SignatureType.ED25519,
         key_identifier=5,
-        key_mode=KeyMode.NAMED,
-        expiry=0,
+        key_mode=KeyMode.PERMANENT,
+        expiry=None,
         public_key=ed25519_pubkey,
         nonce=5,
         time=2_000_000,
@@ -98,20 +97,22 @@ def test_ed25519_secondary_key_round_trip(
 def test_base_message_dispatch(
     dummy_signature_hex: str, dummy_public_key_secp256k1: bytes
 ) -> None:
-    original = _make_named(dummy_signature_hex, dummy_public_key_secp256k1)
+    original = _make_permanent(dummy_signature_hex, dummy_public_key_secp256k1)
     dispatched = BaseMessage.from_bytes(original.to_bytes())
     assert isinstance(dispatched, AddPublicKeyMessage)
     assert dispatched.key_identifier == original.key_identifier
 
 
-def test_secp256k1_sign_and_verify(private_key: PrivateKey, dummy_public_key_secp256k1: bytes) -> None:
+def test_secp256k1_sign_and_verify(
+    private_key: PrivateKey, dummy_public_key_secp256k1: bytes
+) -> None:
     msg = AddPublicKeyMessage(
         version=1,
         signature_type=SignatureType.SECP256K1,
         key_signature_type=SignatureType.SECP256K1,
         key_identifier=1,
-        key_mode=KeyMode.NAMED,
-        expiry=0,
+        key_mode=KeyMode.PERMANENT,
+        expiry=None,
         public_key=dummy_public_key_secp256k1,
         nonce=1,
         time=1_000_000,
@@ -131,7 +132,7 @@ def test_ed25519_sign_and_verify(ed25519_keypair: Keypair) -> None:
         signature_type=SignatureType.ED25519,
         key_signature_type=SignatureType.ED25519,
         key_identifier=2,
-        key_mode=KeyMode.UNNAMED,
+        key_mode=KeyMode.TEMPORARY,
         expiry=9_999_999_999,
         public_key=ed25519_pubkey,
         nonce=2,
@@ -148,5 +149,5 @@ def test_ed25519_sign_and_verify(ed25519_keypair: Keypair) -> None:
 def test_to_bytes_caches_result(
     dummy_signature_hex: str, dummy_public_key_secp256k1: bytes
 ) -> None:
-    msg = _make_named(dummy_signature_hex, dummy_public_key_secp256k1)
+    msg = _make_permanent(dummy_signature_hex, dummy_public_key_secp256k1)
     assert msg.to_bytes() is msg.to_bytes()

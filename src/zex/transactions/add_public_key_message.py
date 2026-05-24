@@ -15,8 +15,8 @@ from zex.utils.zex_types import SignatureType, TransactionType
 
 
 class KeyMode(Enum):
-    NAMED = 0
-    UNNAMED = 1
+    PERMANENT = 0
+    TEMPORARY = 1
 
 
 class AddPublicKeySchema(BaseModel):
@@ -24,7 +24,7 @@ class AddPublicKeySchema(BaseModel):
     key_signature_type: SignatureType
     key_identifier: int
     key_mode: KeyMode
-    expiry: int
+    expiry: int | None
     public_key: bytes
     nonce: int
     time: int
@@ -50,23 +50,25 @@ class AddPublicKeySchema(BaseModel):
 class AddPublicKeyMessage(BaseMessage):
     """Add a secondary public key to an existing user account.
 
-    Named keys (KeyMode.NAMED) are permanent until explicitly removed.
-    Unnamed keys (KeyMode.UNNAMED) expire at the given Unix timestamp (expiry).
-    The key_identifier labels the key so users can reference it when signing
-    transactions with the secondary key.
+    Permanent keys (KeyMode.PERMANENT) are valid until explicitly removed;
+    no expiry is stored on the wire.  Temporary keys (KeyMode.TEMPORARY)
+    expire at the given Unix timestamp and carry an expiry field in the
+    message body.
 
     This message must be signed by the account's master key.
 
     Wire format (v1)
     ----------------
     Header (4 bytes):  version | command='a' | signature_type | key_signature_type
-    Body:              key_identifier | public_key | key_mode | expiry | time | nonce | user_id |
-                       signature
+    Body (PERMANENT):  key_identifier | public_key | key_mode | time | nonce | user_id | signature
+    Body (TEMPORARY):  key_identifier | public_key | key_mode | expiry | time | nonce |
+                       user_id | signature
 
     Wire format (v2)
     ----------------
     Header (4 bytes):  version | command='a' | signature_type | key_signature_type
-    Body:              key_identifier | public_key | key_mode | expiry | time | user_id | signature
+    Body (PERMANENT):  key_identifier | public_key | key_mode | time | user_id | signature
+    Body (TEMPORARY):  key_identifier | public_key | key_mode | expiry | time | user_id | signature
                        (nonce omitted; time serves as replay protection)
     """
 
@@ -80,13 +82,16 @@ class AddPublicKeyMessage(BaseMessage):
         key_signature_type: SignatureType,
         key_identifier: int,
         key_mode: KeyMode,
-        expiry: int,
+        expiry: int | None,
         public_key: bytes,
         nonce: int | None,
         time: int,
         user_id: int,
         signature_hex: str | None = None,
     ) -> None:
+        if version not in (1, 2):
+            raise MessageValidationError("Unsupported version.")
+
         self.version = version
         self.signature_type = signature_type
         self.key_signature_type = key_signature_type
@@ -98,11 +103,12 @@ class AddPublicKeyMessage(BaseMessage):
         self.time = time
         self.user_id = user_id
 
-        if version not in (1, 2):
-            raise MessageValidationError("Unsupported version.")
-
         if version == 1 and nonce is None:
             raise MessageValidationError("nonce is required for v1 messages.")
+        if key_mode == KeyMode.TEMPORARY and expiry is None:
+            raise MessageValidationError("expiry is required for temporary keys.")
+        if key_mode == KeyMode.PERMANENT and expiry is not None:
+            raise MessageValidationError("expiry must not be set for permanent keys.")
 
         self.validate_signature(signature_hex)
         self.signature_hex = signature_hex
@@ -119,16 +125,30 @@ class AddPublicKeyMessage(BaseMessage):
         return ">BBBB"
 
     @classmethod
-    def get_body_format(cls, public_key_length: int, version: int = 1) -> str:
+    def get_body_format(cls, public_key_length: int, version: int, key_mode: KeyMode) -> str:
+        """Return the struct format string for the message body.
+
+        The format depends on both version (v1 includes nonce, v2 does not)
+        and key_mode (TEMPORARY includes expiry, PERMANENT does not).
+        """
+        prefix = f">I {public_key_length}s B"
+        has_expiry = key_mode == KeyMode.TEMPORARY
         if version == 1:
-            return f">I {public_key_length}s B I I I I Q {cls.SIGNATURE_LENGTH}s"
-        elif version == 2:
-            return f">I {public_key_length}s B I I Q {cls.SIGNATURE_LENGTH}s"
-        raise ValueError("Unsupported version.")
+            if has_expiry:
+                suffix = f"I I I Q {cls.SIGNATURE_LENGTH}s"  # expiry, time, nonce, user_id, sig
+            else:
+                suffix = f"I I Q {cls.SIGNATURE_LENGTH}s"  # time, nonce, user_id, sig
+        else:  # v2
+            if has_expiry:
+                suffix = f"I I Q {cls.SIGNATURE_LENGTH}s"  # expiry, time, user_id, sig
+            else:
+                suffix = f"I Q {cls.SIGNATURE_LENGTH}s"  # time, user_id, sig
+        return f"{prefix} {suffix}"
 
     @classmethod
-    def get_format(cls, public_key_length: int, version: int = 1) -> str:
-        return cls.get_header_format() + cls.get_body_format(public_key_length, version)[1:]
+    def get_format(cls, public_key_length: int, version: int, key_mode: KeyMode) -> str:
+        body = cls.get_body_format(public_key_length, version, key_mode)
+        return cls.get_header_format() + body[1:]
 
     def __str__(self) -> str:
         parts = [
@@ -137,8 +157,9 @@ class AddPublicKeyMessage(BaseMessage):
             f"user_id: {self.user_id}",
             f"key_identifier: {self.key_identifier}",
             f"key_mode: {self.key_mode.name.lower()}",
-            f"expiry: {self.expiry}",
         ]
+        if self.key_mode == KeyMode.TEMPORARY:
+            parts.append(f"expiry: {self.expiry}")
         if self.version == 1:
             parts.append(f"nonce: {self._nonce}")
         parts += [
@@ -151,55 +172,37 @@ class AddPublicKeyMessage(BaseMessage):
         if self._transaction_bytes is not None:
             return self._transaction_bytes
         assert self.signature_hex is not None
+
+        fmt = AddPublicKeyMessage.get_format(len(self.public_key), self.version, self.key_mode)
+
+        # Build args: header + body prefix (key_id, pubkey, key_mode)
+        args: list[object] = [
+            self.version,
+            AddPublicKeyMessage.TRANSACTION_TYPE.value,
+            self.signature_type.value,
+            self.key_signature_type.value,
+            self.key_identifier,
+            self.public_key,
+            self.key_mode.value,
+        ]
+        if self.key_mode == KeyMode.TEMPORARY:
+            args.append(self.expiry)
+        args.append(self.time)
         if self.version == 1:
-            transaction_bytes = pack(
-                AddPublicKeyMessage.get_format(
-                    public_key_length=len(self.public_key),
-                    version=1,
-                ),
-                self.version,
-                AddPublicKeyMessage.TRANSACTION_TYPE.value,
-                self.signature_type.value,
-                self.key_signature_type.value,
-                self.key_identifier,
-                self.public_key,
-                self.key_mode.value,
-                self.expiry,
-                self.time,
-                self._nonce,
-                self.user_id,
-                bytes.fromhex(self.signature_hex),
-            )
-        else:  # version == 2
-            transaction_bytes = pack(
-                AddPublicKeyMessage.get_format(
-                    public_key_length=len(self.public_key),
-                    version=2,
-                ),
-                self.version,
-                AddPublicKeyMessage.TRANSACTION_TYPE.value,
-                self.signature_type.value,
-                self.key_signature_type.value,
-                self.key_identifier,
-                self.public_key,
-                self.key_mode.value,
-                self.expiry,
-                self.time,
-                self.user_id,
-                bytes.fromhex(self.signature_hex),
-            )
-        self._transaction_bytes = transaction_bytes
-        return transaction_bytes
+            args.append(self._nonce)
+        args.extend([self.user_id, bytes.fromhex(self.signature_hex)])
+
+        self._transaction_bytes = pack(fmt, *args)
+        return self._transaction_bytes
 
     @classmethod
     def from_bytes(cls, transaction_bytes: bytes) -> "AddPublicKeyMessage":
         if len(transaction_bytes) < cls.HEADER_LENGTH:
             raise HeaderFormatError("Transaction is too short for header.")
         header_bytes = transaction_bytes[: cls.HEADER_LENGTH]
-        header_format = cls.get_header_format()
         try:
             version, command, signature_type, key_signature_type = unpack(
-                header_format, header_bytes
+                cls.get_header_format(), header_bytes
             )
         except struct_error as e:
             raise HeaderFormatError(f"Failed to unpack header: {e}") from e
@@ -215,53 +218,58 @@ class AddPublicKeyMessage(BaseMessage):
         else:
             raise ValueError("Unknown key signature type.")
 
-        body_format = cls.get_body_format(public_key_length, version)
-        body_size = calcsize(body_format)
-        if len(transaction_bytes) - cls.HEADER_LENGTH < body_size:
+        # Peek at key_mode (it comes after key_identifier + public_key in the body).
+        peek_format = f">I {public_key_length}s B"
+        peek_size = calcsize(peek_format)
+        body_start = cls.HEADER_LENGTH
+        if len(transaction_bytes) - body_start < peek_size:
             raise MessageFormatError("Transaction body is too short.")
-        body_bytes = transaction_bytes[cls.HEADER_LENGTH : cls.HEADER_LENGTH + body_size]
+        _, _, key_mode_byte = unpack(
+            peek_format, transaction_bytes[body_start : body_start + peek_size]
+        )
+        key_mode = KeyMode(key_mode_byte)
 
-        if version == 1:
-            try:
-                (
-                    key_identifier,
-                    public_key,
-                    key_mode_value,
-                    expiry,
-                    time,
-                    nonce,
-                    user_id,
-                    signature_bytes,
-                ) = unpack(body_format, body_bytes)
-            except struct_error as e:
-                raise MessageFormatError(f"Failed to unpack body: {e}") from e
-        else:  # v2
-            try:
-                (
-                    key_identifier,
-                    public_key,
-                    key_mode_value,
-                    expiry,
-                    time,
-                    user_id,
-                    signature_bytes,
-                ) = unpack(body_format, body_bytes)
-            except struct_error as e:
-                raise MessageFormatError(f"Failed to unpack body: {e}") from e
-            nonce = None
+        # Full body parse now that we know key_mode.
+        body_format = cls.get_body_format(public_key_length, version, key_mode)
+        body_size = calcsize(body_format)
+        if len(transaction_bytes) - body_start < body_size:
+            raise MessageFormatError("Transaction body is too short.")
+        body_bytes = transaction_bytes[body_start : body_start + body_size]
+
+        try:
+            if version == 1 and key_mode == KeyMode.TEMPORARY:
+                key_id, pub_key, km, expiry, time, nonce, user_id, sig_bytes = unpack(
+                    body_format, body_bytes
+                )
+            elif version == 1:  # PERMANENT
+                key_id, pub_key, km, time, nonce, user_id, sig_bytes = unpack(
+                    body_format, body_bytes
+                )
+                expiry = None
+            elif key_mode == KeyMode.TEMPORARY:  # v2, TEMPORARY
+                key_id, pub_key, km, expiry, time, user_id, sig_bytes = unpack(
+                    body_format, body_bytes
+                )
+                nonce = None
+            else:  # v2, PERMANENT
+                key_id, pub_key, km, time, user_id, sig_bytes = unpack(body_format, body_bytes)
+                expiry = None
+                nonce = None
+        except struct_error as e:
+            raise MessageFormatError(f"Failed to unpack body: {e}") from e
 
         message = cls(
             version=version,
             signature_type=sig_type,
             key_signature_type=key_sig_type,
-            key_identifier=key_identifier,
-            key_mode=KeyMode(key_mode_value),
+            key_identifier=key_id,
+            key_mode=KeyMode(km),
             expiry=expiry,
-            public_key=public_key,
+            public_key=pub_key,
             nonce=nonce,
             time=time,
             user_id=user_id,
-            signature_hex=signature_bytes.hex(),
+            signature_hex=sig_bytes.hex(),
         )
         message._transaction_bytes = transaction_bytes
         return message
