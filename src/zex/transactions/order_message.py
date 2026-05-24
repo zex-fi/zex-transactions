@@ -191,9 +191,14 @@ class OrderMessage(BaseMessage):
                 raise MessageFormatError(f"Failed to unpack body: {e}") from e
             nonce = None
 
+        try:
+            sig_type = SignatureType.from_int(signature_type)
+        except ValueError as e:
+            raise MessageFormatError(f"Invalid signature type: {e}") from e
+
         order_message = cls(
             version=version,
-            signature_type=SignatureType.from_int(signature_type),
+            signature_type=sig_type,
             base_token=base_token_bytes.decode("ascii"),
             quote_token=quote_token_bytes.decode("ascii"),
             amount_mantissa=amount_mantissa,

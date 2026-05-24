@@ -142,9 +142,14 @@ class WithdrawMessage(BaseMessage):
         chain_name = ChainName.from_string(token_chain_bytes.decode("ascii"))
         token_name = token_name_bytes.decode("ascii")
 
+        try:
+            sig_type = SignatureType.from_int(signature_type)
+        except ValueError as e:
+            raise MessageFormatError(f"Invalid signature type: {e}") from e
+
         withdraw_message = cls(
             version=version,
-            signature_type=SignatureType.from_int(signature_type),
+            signature_type=sig_type,
             token_name=token_name,
             chain_name=chain_name,
             amount_mantissa=amount_mantissa,

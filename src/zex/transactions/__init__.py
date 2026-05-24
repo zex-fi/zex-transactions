@@ -12,6 +12,8 @@ from .exceptions import HeaderFormatError as HeaderFormatError
 from .exceptions import MessageFormatError as MessageFormatError
 from .exceptions import MessageValidationError as MessageValidationError
 from .exceptions import UnexpectedCommandError as UnexpectedCommandError
+from .login_message import LoginMessage as LoginMessage
+from .login_message import LoginSchema as LoginSchema
 from .order_message import OrderMessage as OrderMessage
 from .pause_withdraw_message import PauseWithdrawMessage as PauseWithdrawMessage
 from .register_message import RegisterMessage as RegisterMessage

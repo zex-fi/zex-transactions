@@ -48,6 +48,7 @@ class TransactionType(Enum):
     PAUSE = ord("p")
     UPDATE_WITHDRAW = ord("u")
     ADD_PUBLIC_KEY = ord("a")
+    LOGIN = ord("l")
     REMOVE_PUBLIC_KEY = ord("k")
 
 

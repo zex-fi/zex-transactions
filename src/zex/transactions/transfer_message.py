@@ -155,9 +155,14 @@ class TransferMessage(BaseMessage):
                 raise MessageFormatError(f"Failed to unpack body: {e}") from e
             nonce = None
 
+        try:
+            sig_type = SignatureType.from_int(signature_type)
+        except ValueError as e:
+            raise MessageFormatError(f"Invalid signature type: {e}") from e
+
         transfer_message = cls(
             version=version,
-            signature_type=SignatureType.from_int(signature_type),
+            signature_type=sig_type,
             token_name=token_name_bytes.decode("ascii"),
             amount_mantissa=amount_mantissa,
             amount_exponent=amount_exponent,
