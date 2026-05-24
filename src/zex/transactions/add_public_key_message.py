@@ -60,7 +60,8 @@ class AddPublicKeyMessage(BaseMessage):
     Wire format (v1)
     ----------------
     Header (4 bytes):  version | command='a' | signature_type | key_signature_type
-    Body:              key_identifier | public_key | key_mode | expiry | time | nonce | user_id | signature
+    Body:              key_identifier | public_key | key_mode | expiry | time | nonce | user_id |
+                       signature
 
     Wire format (v2)
     ----------------

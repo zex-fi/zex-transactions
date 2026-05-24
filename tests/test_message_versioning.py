@@ -34,7 +34,7 @@ SECP256K1_PUBKEY = bytes(range(33))
 
 
 class TestBuyMessageV2:
-    def _make(self, sig: str = DUMMY_SIG) -> BuyMessage:
+    def _make(self, sig: str | None = DUMMY_SIG) -> BuyMessage:
         return BuyMessage(
             version=2,
             signature_type=SignatureType.SECP256K1,
@@ -149,7 +149,7 @@ class TestSellMessageV2:
 
 
 class TestCancelMessageV2:
-    def _make(self, sig: str = DUMMY_SIG) -> CancelMessage:
+    def _make(self, sig: str | None = DUMMY_SIG) -> CancelMessage:
         return CancelMessage(
             version=2,
             signature_type=SignatureType.SECP256K1,
