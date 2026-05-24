@@ -98,6 +98,9 @@ class AddPublicKeyMessage(BaseMessage):
         self.time = time
         self.user_id = user_id
 
+        if version not in (1, 2):
+            raise MessageValidationError("Unsupported version.")
+
         if version == 1 and nonce is None:
             raise MessageValidationError("nonce is required for v1 messages.")
 
@@ -107,7 +110,7 @@ class AddPublicKeyMessage(BaseMessage):
 
     @property
     def nonce(self) -> int:
-        if self._nonce is None:
+        if self.version == 2 or self._nonce is None:
             raise AttributeError("nonce is not available in v2 messages; use time instead.")
         return self._nonce
 
@@ -117,9 +120,11 @@ class AddPublicKeyMessage(BaseMessage):
 
     @classmethod
     def get_body_format(cls, public_key_length: int, version: int = 1) -> str:
-        if version == 2:
+        if version == 1:
+            return f">I {public_key_length}s B I I I I Q {cls.SIGNATURE_LENGTH}s"
+        elif version == 2:
             return f">I {public_key_length}s B I I Q {cls.SIGNATURE_LENGTH}s"
-        return f">I {public_key_length}s B I I I Q {cls.SIGNATURE_LENGTH}s"
+        raise ValueError("Unsupported version.")
 
     @classmethod
     def get_format(cls, public_key_length: int, version: int = 1) -> str:
