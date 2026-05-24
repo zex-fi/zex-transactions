@@ -9,7 +9,7 @@ def _make_msg(dummy_signature_hex: str) -> RemovePublicKeyMessage:
     return RemovePublicKeyMessage(
         version=1,
         signature_type=SignatureType.SECP256K1,
-        key_identifier="my_agent",
+        key_identifier=1,
         nonce=1,
         time=1_000_000,
         user_id=42,
@@ -42,7 +42,7 @@ def test_secp256k1_sign_and_verify(private_key: PrivateKey) -> None:
     msg = RemovePublicKeyMessage(
         version=1,
         signature_type=SignatureType.SECP256K1,
-        key_identifier="agent",
+        key_identifier=1,
         nonce=1,
         time=1_000_000,
         user_id=1,
@@ -58,7 +58,7 @@ def test_ed25519_sign_and_verify(ed25519_keypair: Keypair) -> None:
     msg = RemovePublicKeyMessage(
         version=1,
         signature_type=SignatureType.ED25519,
-        key_identifier="sol_agent",
+        key_identifier=2,
         nonce=2,
         time=1_000_000,
         user_id=5,

@@ -31,7 +31,6 @@ class CancelSchema(BaseModel):
 
 class CancelMessage(BaseMessage):
     TRANSACTION_TYPE = TransactionType.CANCEL
-    # v1 header is 3 bytes; v2 header is 4 bytes (adds key_identifier_length).
     HEADER_LENGTH = 3
 
     def __init__(
@@ -41,7 +40,7 @@ class CancelMessage(BaseMessage):
         order_nonce: int,
         user_id: int,
         signature_hex: str | None = None,
-        key_identifier: str | None = None,
+        key_identifier: int | None = None,
     ) -> None:
         self.signature_type = signature_type
         self.validate_signature(signature_hex)
@@ -58,68 +57,51 @@ class CancelMessage(BaseMessage):
         self._transaction_bytes: bytes | None = None
 
     @property
-    def key_identifier(self) -> str:
+    def key_identifier(self) -> int:
         if self._key_identifier is None:
             raise AttributeError("key_identifier is not available in v1 messages.")
         return self._key_identifier
 
     @classmethod
     def get_header_format(cls, version: int = 1) -> str:
-        if version == 2:
-            return ">BBBB"  # adds key_identifier_length
         return ">BBB"
 
     @classmethod
-    def get_body_format(cls, version: int = 1, key_identifier_length: int = 0) -> str:
+    def get_body_format(cls, version: int = 1) -> str:
         if version == 2:
-            return f">QQ {key_identifier_length}s {cls.SIGNATURE_LENGTH}s"
+            return f">QQI {cls.SIGNATURE_LENGTH}s"
         return f">QQ {cls.SIGNATURE_LENGTH}s"
 
     @classmethod
-    def get_format(cls, version: int = 1, key_identifier_length: int = 0) -> str:
-        return (
-            cls.get_header_format(version) + cls.get_body_format(version, key_identifier_length)[1:]
-        )
+    def get_format(cls, version: int = 1) -> str:
+        return cls.get_header_format(version) + cls.get_body_format(version)[1:]
 
     @classmethod
     def from_bytes(cls, transaction_bytes: bytes) -> "CancelMessage":
         if len(transaction_bytes) < cls.HEADER_LENGTH:
             raise HeaderFormatError("Transaction is too short for header.")
 
-        msg_version = transaction_bytes[0]
-        header_format = cls.get_header_format(msg_version)
+        header_format = cls.get_header_format()
         header_length = calcsize(header_format)
-
-        if len(transaction_bytes) < header_length:
-            raise HeaderFormatError("Transaction is too short for header.")
         header_bytes = transaction_bytes[:header_length]
 
-        if msg_version == 1:
-            try:
-                version, command, signature_type = unpack(header_format, header_bytes)
-            except struct_error as e:
-                raise HeaderFormatError(f"Failed to unpack header: {e}") from e
-            key_identifier_length = 0
-        elif msg_version == 2:
-            try:
-                version, command, signature_type, key_identifier_length = unpack(
-                    header_format, header_bytes
-                )
-            except struct_error as e:
-                raise HeaderFormatError(f"Failed to unpack header: {e}") from e
-        else:
-            raise MessageFormatError(f"Unsupported message version: {msg_version}")
+        try:
+            version, command, signature_type = unpack(header_format, header_bytes)
+        except struct_error as e:
+            raise HeaderFormatError(f"Failed to unpack header: {e}") from e
 
+        if version not in (1, 2):
+            raise MessageFormatError(f"Unsupported message version: {version}")
         if command != cls.TRANSACTION_TYPE.value:
             raise UnexpectedCommandError("Unexpected command.")
 
-        body_format = cls.get_body_format(msg_version, key_identifier_length)
+        body_format = cls.get_body_format(version)
         body_size = calcsize(body_format)
         if len(transaction_bytes) - header_length < body_size:
             raise MessageFormatError("Transaction body is too short.")
         body_bytes = transaction_bytes[header_length : header_length + body_size]
 
-        if msg_version == 1:
+        if version == 1:
             try:
                 user_id, order_nonce, signature_bytes = unpack(body_format, body_bytes)
             except struct_error as e:
@@ -127,12 +109,11 @@ class CancelMessage(BaseMessage):
             key_identifier = None
         else:  # v2
             try:
-                user_id, order_nonce, key_identifier_bytes, signature_bytes = unpack(
+                user_id, order_nonce, key_identifier, signature_bytes = unpack(
                     body_format, body_bytes
                 )
             except struct_error as e:
                 raise MessageFormatError(f"Failed to unpack body: {e}") from e
-            key_identifier = key_identifier_bytes.decode("ascii")
 
         cancel_message = cls(
             version=version,
@@ -172,16 +153,13 @@ class CancelMessage(BaseMessage):
             )
         else:  # version == 2
             transaction_bytes = pack(
-                CancelMessage.get_format(
-                    version=2, key_identifier_length=len(self._key_identifier)
-                ),
+                CancelMessage.get_format(version=2),
                 self.version,
                 CancelMessage.TRANSACTION_TYPE.value,
                 self.signature_type.value,
-                len(self._key_identifier),
                 self.user_id,
                 self.order_nonce,
-                self._key_identifier.encode("ascii"),
+                self._key_identifier,
                 bytes.fromhex(self.signature_hex),
             )
         self._transaction_bytes = transaction_bytes

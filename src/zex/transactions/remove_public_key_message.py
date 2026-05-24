@@ -15,7 +15,7 @@ from zex.utils.zex_types import SignatureType, TransactionType
 
 class RemovePublicKeySchema(BaseModel):
     sig_type: SignatureType
-    key_identifier: str
+    key_identifier: int
     nonce: int
     time: int
     user_id: int
@@ -41,24 +41,24 @@ class RemovePublicKeyMessage(BaseMessage):
 
     Wire format (v1)
     ----------------
-    Header (4 bytes):  version | command='k' | signature_type | key_identifier_length
+    Header (3 bytes):  version | command='k' | signature_type
     Body:              key_identifier | time | nonce | user_id | signature
 
     Wire format (v2)
     ----------------
-    Header (4 bytes):  version | command='k' | signature_type | key_identifier_length
+    Header (3 bytes):  version | command='k' | signature_type
     Body:              key_identifier | time | user_id | signature
                        (nonce omitted; time serves as replay protection)
     """
 
     TRANSACTION_TYPE = TransactionType.REMOVE_PUBLIC_KEY
-    HEADER_LENGTH = 4
+    HEADER_LENGTH = 3
 
     def __init__(
         self,
         version: int,
         signature_type: SignatureType,
-        key_identifier: str,
+        key_identifier: int,
         nonce: int | None,
         time: int,
         user_id: int,
@@ -86,17 +86,17 @@ class RemovePublicKeyMessage(BaseMessage):
 
     @classmethod
     def get_header_format(cls) -> str:
-        return ">BBBB"
+        return ">BBB"
 
     @classmethod
-    def get_body_format(cls, key_identifier_length: int, version: int = 1) -> str:
+    def get_body_format(cls, version: int = 1) -> str:
         if version == 2:
-            return f">{key_identifier_length}s I Q {cls.SIGNATURE_LENGTH}s"
-        return f">{key_identifier_length}s I I Q {cls.SIGNATURE_LENGTH}s"
+            return f">I I Q {cls.SIGNATURE_LENGTH}s"
+        return f">I I I Q {cls.SIGNATURE_LENGTH}s"
 
     @classmethod
-    def get_format(cls, key_identifier_length: int, version: int = 1) -> str:
-        return cls.get_header_format() + cls.get_body_format(key_identifier_length, version)[1:]
+    def get_format(cls, version: int = 1) -> str:
+        return cls.get_header_format() + cls.get_body_format(version)[1:]
 
     def __str__(self) -> str:
         parts = [
@@ -116,15 +116,11 @@ class RemovePublicKeyMessage(BaseMessage):
         assert self.signature_hex is not None
         if self.version == 1:
             transaction_bytes = pack(
-                RemovePublicKeyMessage.get_format(
-                    key_identifier_length=len(self.key_identifier),
-                    version=1,
-                ),
+                RemovePublicKeyMessage.get_format(version=1),
                 self.version,
                 RemovePublicKeyMessage.TRANSACTION_TYPE.value,
                 self.signature_type.value,
-                len(self.key_identifier),
-                self.key_identifier.encode("ascii"),
+                self.key_identifier,
                 self.time,
                 self._nonce,
                 self.user_id,
@@ -132,15 +128,11 @@ class RemovePublicKeyMessage(BaseMessage):
             )
         else:  # version == 2
             transaction_bytes = pack(
-                RemovePublicKeyMessage.get_format(
-                    key_identifier_length=len(self.key_identifier),
-                    version=2,
-                ),
+                RemovePublicKeyMessage.get_format(version=2),
                 self.version,
                 RemovePublicKeyMessage.TRANSACTION_TYPE.value,
                 self.signature_type.value,
-                len(self.key_identifier),
-                self.key_identifier.encode("ascii"),
+                self.key_identifier,
                 self.time,
                 self.user_id,
                 bytes.fromhex(self.signature_hex),
@@ -155,15 +147,13 @@ class RemovePublicKeyMessage(BaseMessage):
         header_bytes = transaction_bytes[: cls.HEADER_LENGTH]
         header_format = cls.get_header_format()
         try:
-            version, command, signature_type, key_identifier_length = unpack(
-                header_format, header_bytes
-            )
+            version, command, signature_type = unpack(header_format, header_bytes)
         except struct_error as e:
             raise HeaderFormatError(f"Failed to unpack header: {e}") from e
         if command != cls.TRANSACTION_TYPE.value:
             raise UnexpectedCommandError("Unexpected command.")
 
-        body_format = cls.get_body_format(key_identifier_length, version)
+        body_format = cls.get_body_format(version)
         body_size = calcsize(body_format)
         if len(transaction_bytes) - cls.HEADER_LENGTH < body_size:
             raise MessageFormatError("Transaction body is too short.")
@@ -171,23 +161,14 @@ class RemovePublicKeyMessage(BaseMessage):
 
         if version == 1:
             try:
-                (
-                    key_identifier,
-                    time,
-                    nonce,
-                    user_id,
-                    signature_bytes,
-                ) = unpack(body_format, body_bytes)
+                key_identifier, time, nonce, user_id, signature_bytes = unpack(
+                    body_format, body_bytes
+                )
             except struct_error as e:
                 raise MessageFormatError(f"Failed to unpack body: {e}") from e
         else:  # v2
             try:
-                (
-                    key_identifier,
-                    time,
-                    user_id,
-                    signature_bytes,
-                ) = unpack(body_format, body_bytes)
+                key_identifier, time, user_id, signature_bytes = unpack(body_format, body_bytes)
             except struct_error as e:
                 raise MessageFormatError(f"Failed to unpack body: {e}") from e
             nonce = None
@@ -195,7 +176,7 @@ class RemovePublicKeyMessage(BaseMessage):
         message = cls(
             version=version,
             signature_type=SignatureType.from_int(signature_type),
-            key_identifier=key_identifier.decode("ascii"),
+            key_identifier=key_identifier,
             nonce=nonce,
             time=time,
             user_id=user_id,

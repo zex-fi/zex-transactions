@@ -48,7 +48,7 @@ class TestBuyMessageV2:
             nonce=None,
             user_id=1,
             signature_hex=sig,
-            key_identifier="my_agent",
+            key_identifier=42,
         )
 
     def test_round_trip(self) -> None:
@@ -56,7 +56,7 @@ class TestBuyMessageV2:
         reconstructed = BuyMessage.from_bytes(original.to_bytes())
 
         assert reconstructed.version == 2
-        assert reconstructed.key_identifier == "my_agent"
+        assert reconstructed.key_identifier == 42
         assert reconstructed.base_token == "BTC"
         assert reconstructed.quote_token == "USDT"
         assert reconstructed.time == 10_000
@@ -134,12 +134,12 @@ class TestSellMessageV2:
             nonce=None,
             user_id=5,
             signature_hex=DUMMY_SIG,
-            key_identifier="sell_agent",
+            key_identifier=7,
         )
         reconstructed = SellMessage.from_bytes(original.to_bytes())
 
         assert reconstructed.version == 2
-        assert reconstructed.key_identifier == "sell_agent"
+        assert reconstructed.key_identifier == 7
         assert reconstructed.user_id == 5
 
 
@@ -156,7 +156,7 @@ class TestCancelMessageV2:
             order_nonce=42,
             user_id=7,
             signature_hex=sig,
-            key_identifier="cancel_agent",
+            key_identifier=3,
         )
 
     def test_round_trip(self) -> None:
@@ -166,7 +166,7 @@ class TestCancelMessageV2:
         assert reconstructed.version == 2
         assert reconstructed.order_nonce == 42
         assert reconstructed.user_id == 7
-        assert reconstructed.key_identifier == "cancel_agent"
+        assert reconstructed.key_identifier == 3
         assert reconstructed.signature_hex == DUMMY_SIG
 
     def test_order_nonce_accessible_in_v2(self) -> None:
@@ -321,7 +321,7 @@ class TestAddPublicKeyMessageV2:
             version=2,
             signature_type=SignatureType.SECP256K1,
             key_signature_type=SignatureType.SECP256K1,
-            key_identifier="agent",
+            key_identifier=10,
             key_mode=KeyMode.NAMED,
             expiry=0,
             public_key=SECP256K1_PUBKEY,
@@ -333,7 +333,7 @@ class TestAddPublicKeyMessageV2:
         reconstructed = AddPublicKeyMessage.from_bytes(original.to_bytes())
 
         assert reconstructed.version == 2
-        assert reconstructed.key_identifier == "agent"
+        assert reconstructed.key_identifier == 10
         assert reconstructed.public_key == SECP256K1_PUBKEY
 
     def test_nonce_raises_in_v2(self) -> None:
@@ -341,7 +341,7 @@ class TestAddPublicKeyMessageV2:
             version=2,
             signature_type=SignatureType.SECP256K1,
             key_signature_type=SignatureType.SECP256K1,
-            key_identifier="agent",
+            key_identifier=10,
             key_mode=KeyMode.NAMED,
             expiry=0,
             public_key=SECP256K1_PUBKEY,
@@ -364,7 +364,7 @@ class TestRemovePublicKeyMessageV2:
         original = RemovePublicKeyMessage(
             version=2,
             signature_type=SignatureType.SECP256K1,
-            key_identifier="agent",
+            key_identifier=10,
             nonce=None,
             time=1_000_000,
             user_id=42,
@@ -373,14 +373,14 @@ class TestRemovePublicKeyMessageV2:
         reconstructed = RemovePublicKeyMessage.from_bytes(original.to_bytes())
 
         assert reconstructed.version == 2
-        assert reconstructed.key_identifier == "agent"
+        assert reconstructed.key_identifier == 10
         assert reconstructed.user_id == 42
 
     def test_nonce_raises_in_v2(self) -> None:
         msg = RemovePublicKeyMessage(
             version=2,
             signature_type=SignatureType.SECP256K1,
-            key_identifier="agent",
+            key_identifier=10,
             nonce=None,
             time=1_000_000,
             user_id=42,

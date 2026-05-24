@@ -32,7 +32,7 @@ class OrderMessage(BaseMessage):
         nonce: int | None,
         user_id: int,
         signature_hex: str | None = None,
-        key_identifier: str | None = None,
+        key_identifier: int | None = None,
     ) -> None:
         self.version = version
         self.signature_type = signature_type
@@ -74,7 +74,7 @@ class OrderMessage(BaseMessage):
         return self._nonce
 
     @property
-    def key_identifier(self) -> str:
+    def key_identifier(self) -> int:
         if self._key_identifier is None:
             raise AttributeError("key_identifier is not available in v1 messages.")
         return self._key_identifier
@@ -91,8 +91,6 @@ class OrderMessage(BaseMessage):
 
     @classmethod
     def get_header_format(cls, version: int = 1) -> str:
-        if version == 2:
-            return ">BBBBBB"  # adds key_identifier_length
         return ">BBBBB"
 
     @classmethod
@@ -101,11 +99,10 @@ class OrderMessage(BaseMessage):
         base_token_length: int,
         quote_token_length: int,
         version: int = 1,
-        key_identifier_length: int = 0,
     ) -> str:
         base = f">{base_token_length}s {quote_token_length}s Q b Q b I"
         if version == 2:
-            return base + f" {key_identifier_length}s Q {cls.SIGNATURE_LENGTH}s"
+            return base + f" I Q {cls.SIGNATURE_LENGTH}s"
         return base + f" Q Q {cls.SIGNATURE_LENGTH}s"
 
     @classmethod
@@ -114,13 +111,10 @@ class OrderMessage(BaseMessage):
         base_token_length: int,
         quote_token_length: int,
         version: int = 1,
-        key_identifier_length: int = 0,
     ) -> str:
         return (
             cls.get_header_format(version)
-            + cls.get_body_format(
-                base_token_length, quote_token_length, version, key_identifier_length
-            )[1:]
+            + cls.get_body_format(base_token_length, quote_token_length, version)[1:]
         )
 
     @classmethod
@@ -136,27 +130,14 @@ class OrderMessage(BaseMessage):
             raise HeaderFormatError("Transaction is too short for header.")
         header_bytes = transaction_bytes[:header_length]
 
-        if msg_version == 1:
-            try:
-                version, command, signature_type, base_token_length, quote_token_length = unpack(
-                    header_format, header_bytes
-                )
-            except struct_error as e:
-                raise HeaderFormatError(f"Failed to unpack header: {e}") from e
-            key_identifier_length = 0
-        elif msg_version == 2:
-            try:
-                (
-                    version,
-                    command,
-                    signature_type,
-                    base_token_length,
-                    quote_token_length,
-                    key_identifier_length,
-                ) = unpack(header_format, header_bytes)
-            except struct_error as e:
-                raise HeaderFormatError(f"Failed to unpack header: {e}") from e
-        else:
+        try:
+            version, command, signature_type, base_token_length, quote_token_length = unpack(
+                header_format, header_bytes
+            )
+        except struct_error as e:
+            raise HeaderFormatError(f"Failed to unpack header: {e}") from e
+
+        if msg_version not in (1, 2):
             raise MessageFormatError(f"Unsupported message version: {msg_version}")
 
         if command != cls.TRANSACTION_TYPE.value:
@@ -166,9 +147,7 @@ class OrderMessage(BaseMessage):
         if quote_token_length == 0:
             raise MessageFormatError("Invalid quote token length.")
 
-        body_format = cls.get_body_format(
-            base_token_length, quote_token_length, msg_version, key_identifier_length
-        )
+        body_format = cls.get_body_format(base_token_length, quote_token_length, msg_version)
         body_size = calcsize(body_format)
         if len(transaction_bytes) - header_length < body_size:
             raise MessageFormatError("Transaction body is too short.")
@@ -201,13 +180,12 @@ class OrderMessage(BaseMessage):
                     price_mantissa,
                     price_exponent,
                     time,
-                    key_identifier_bytes,
+                    key_identifier,
                     user_id,
                     signature_bytes,
                 ) = unpack(body_format, body_bytes)
             except struct_error as e:
                 raise MessageFormatError(f"Failed to unpack body: {e}") from e
-            key_identifier = key_identifier_bytes.decode("ascii")
             nonce = None
 
         order_message = cls(
@@ -281,14 +259,12 @@ class OrderMessage(BaseMessage):
                     base_token_length=len(self.base_token),
                     quote_token_length=len(self.quote_token),
                     version=2,
-                    key_identifier_length=len(self._key_identifier),
                 ),
                 self.version,
                 self.TRANSACTION_TYPE.value,
                 self.signature_type.value,
                 len(self.base_token),
                 len(self.quote_token),
-                len(self._key_identifier),
                 self.base_token.encode("ascii"),
                 self.quote_token.encode("ascii"),
                 self.amount_mantissa,
@@ -296,7 +272,7 @@ class OrderMessage(BaseMessage):
                 self.price_mantissa,
                 self.price_exponent,
                 self.time,
-                self._key_identifier.encode("ascii"),
+                self._key_identifier,
                 self.user_id,
                 bytes.fromhex(self.signature_hex),
             )

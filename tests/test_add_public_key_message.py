@@ -14,7 +14,7 @@ def _make_named(
         version=1,
         signature_type=SignatureType.SECP256K1,
         key_signature_type=SignatureType.SECP256K1,
-        key_identifier="my_agent",
+        key_identifier=1,
         key_mode=KeyMode.NAMED,
         expiry=0,
         public_key=dummy_public_key_secp256k1,
@@ -52,7 +52,7 @@ def test_unnamed_key_round_trip(
         version=1,
         signature_type=SignatureType.SECP256K1,
         key_signature_type=SignatureType.SECP256K1,
-        key_identifier="temp_key",
+        key_identifier=99,
         key_mode=KeyMode.UNNAMED,
         expiry=1_800_000_000,
         public_key=dummy_public_key_secp256k1,
@@ -66,7 +66,7 @@ def test_unnamed_key_round_trip(
 
     assert reconstructed.key_mode == KeyMode.UNNAMED
     assert reconstructed.expiry == 1_800_000_000
-    assert reconstructed.key_identifier == "temp_key"
+    assert reconstructed.key_identifier == 99
     assert reconstructed.user_id == 7
 
 
@@ -78,7 +78,7 @@ def test_ed25519_secondary_key_round_trip(
         version=1,
         signature_type=SignatureType.SECP256K1,
         key_signature_type=SignatureType.ED25519,
-        key_identifier="sol_key",
+        key_identifier=5,
         key_mode=KeyMode.NAMED,
         expiry=0,
         public_key=ed25519_pubkey,
@@ -109,7 +109,7 @@ def test_secp256k1_sign_and_verify(private_key: PrivateKey, dummy_public_key_sec
         version=1,
         signature_type=SignatureType.SECP256K1,
         key_signature_type=SignatureType.SECP256K1,
-        key_identifier="agent",
+        key_identifier=1,
         key_mode=KeyMode.NAMED,
         expiry=0,
         public_key=dummy_public_key_secp256k1,
@@ -130,7 +130,7 @@ def test_ed25519_sign_and_verify(ed25519_keypair: Keypair) -> None:
         version=1,
         signature_type=SignatureType.ED25519,
         key_signature_type=SignatureType.ED25519,
-        key_identifier="sol_agent",
+        key_identifier=2,
         key_mode=KeyMode.UNNAMED,
         expiry=9_999_999_999,
         public_key=ed25519_pubkey,

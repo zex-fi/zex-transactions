@@ -22,7 +22,7 @@ class KeyMode(Enum):
 class AddPublicKeySchema(BaseModel):
     sig_type: SignatureType
     key_signature_type: SignatureType
-    key_identifier: str
+    key_identifier: int
     key_mode: KeyMode
     expiry: int
     public_key: bytes
@@ -59,25 +59,25 @@ class AddPublicKeyMessage(BaseMessage):
 
     Wire format (v1)
     ----------------
-    Header (5 bytes):  version | command='a' | signature_type | key_signature_type | key_identifier_length
+    Header (4 bytes):  version | command='a' | signature_type | key_signature_type
     Body:              key_identifier | public_key | key_mode | expiry | time | nonce | user_id | signature
 
     Wire format (v2)
     ----------------
-    Header (5 bytes):  version | command='a' | signature_type | key_signature_type | key_identifier_length
+    Header (4 bytes):  version | command='a' | signature_type | key_signature_type
     Body:              key_identifier | public_key | key_mode | expiry | time | user_id | signature
                        (nonce omitted; time serves as replay protection)
     """
 
     TRANSACTION_TYPE = TransactionType.ADD_PUBLIC_KEY
-    HEADER_LENGTH = 5
+    HEADER_LENGTH = 4
 
     def __init__(
         self,
         version: int,
         signature_type: SignatureType,
         key_signature_type: SignatureType,
-        key_identifier: str,
+        key_identifier: int,
         key_mode: KeyMode,
         expiry: int,
         public_key: bytes,
@@ -112,24 +112,17 @@ class AddPublicKeyMessage(BaseMessage):
 
     @classmethod
     def get_header_format(cls) -> str:
-        return ">BBBBB"
+        return ">BBBB"
 
     @classmethod
-    def get_body_format(
-        cls, key_identifier_length: int, public_key_length: int, version: int = 1
-    ) -> str:
+    def get_body_format(cls, public_key_length: int, version: int = 1) -> str:
         if version == 2:
-            return f">{key_identifier_length}s {public_key_length}s B I I Q {cls.SIGNATURE_LENGTH}s"
-        return f">{key_identifier_length}s {public_key_length}s B I I I Q {cls.SIGNATURE_LENGTH}s"
+            return f">I {public_key_length}s B I I Q {cls.SIGNATURE_LENGTH}s"
+        return f">I {public_key_length}s B I I I Q {cls.SIGNATURE_LENGTH}s"
 
     @classmethod
-    def get_format(
-        cls, key_identifier_length: int, public_key_length: int, version: int = 1
-    ) -> str:
-        return (
-            cls.get_header_format()
-            + cls.get_body_format(key_identifier_length, public_key_length, version)[1:]
-        )
+    def get_format(cls, public_key_length: int, version: int = 1) -> str:
+        return cls.get_header_format() + cls.get_body_format(public_key_length, version)[1:]
 
     def __str__(self) -> str:
         parts = [
@@ -155,7 +148,6 @@ class AddPublicKeyMessage(BaseMessage):
         if self.version == 1:
             transaction_bytes = pack(
                 AddPublicKeyMessage.get_format(
-                    key_identifier_length=len(self.key_identifier),
                     public_key_length=len(self.public_key),
                     version=1,
                 ),
@@ -163,8 +155,7 @@ class AddPublicKeyMessage(BaseMessage):
                 AddPublicKeyMessage.TRANSACTION_TYPE.value,
                 self.signature_type.value,
                 self.key_signature_type.value,
-                len(self.key_identifier),
-                self.key_identifier.encode("ascii"),
+                self.key_identifier,
                 self.public_key,
                 self.key_mode.value,
                 self.expiry,
@@ -176,7 +167,6 @@ class AddPublicKeyMessage(BaseMessage):
         else:  # version == 2
             transaction_bytes = pack(
                 AddPublicKeyMessage.get_format(
-                    key_identifier_length=len(self.key_identifier),
                     public_key_length=len(self.public_key),
                     version=2,
                 ),
@@ -184,8 +174,7 @@ class AddPublicKeyMessage(BaseMessage):
                 AddPublicKeyMessage.TRANSACTION_TYPE.value,
                 self.signature_type.value,
                 self.key_signature_type.value,
-                len(self.key_identifier),
-                self.key_identifier.encode("ascii"),
+                self.key_identifier,
                 self.public_key,
                 self.key_mode.value,
                 self.expiry,
@@ -203,7 +192,7 @@ class AddPublicKeyMessage(BaseMessage):
         header_bytes = transaction_bytes[: cls.HEADER_LENGTH]
         header_format = cls.get_header_format()
         try:
-            version, command, signature_type, key_signature_type, key_identifier_length = unpack(
+            version, command, signature_type, key_signature_type = unpack(
                 header_format, header_bytes
             )
         except struct_error as e:
@@ -220,7 +209,7 @@ class AddPublicKeyMessage(BaseMessage):
         else:
             raise ValueError("Unknown key signature type.")
 
-        body_format = cls.get_body_format(key_identifier_length, public_key_length, version)
+        body_format = cls.get_body_format(public_key_length, version)
         body_size = calcsize(body_format)
         if len(transaction_bytes) - cls.HEADER_LENGTH < body_size:
             raise MessageFormatError("Transaction body is too short.")
@@ -259,7 +248,7 @@ class AddPublicKeyMessage(BaseMessage):
             version=version,
             signature_type=sig_type,
             key_signature_type=key_sig_type,
-            key_identifier=key_identifier.decode("ascii"),
+            key_identifier=key_identifier,
             key_mode=KeyMode(key_mode_value),
             expiry=expiry,
             public_key=public_key,
