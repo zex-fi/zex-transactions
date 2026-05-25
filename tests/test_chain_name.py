@@ -1,6 +1,5 @@
-import pytest
 import base58
-
+import pytest
 
 from zex.utils.zex_types import ChainName, ChainNameInvalidValueError, EncodingType
 

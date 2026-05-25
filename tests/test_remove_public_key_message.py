@@ -9,7 +9,7 @@ def _make_msg(dummy_signature_hex: str) -> RemovePublicKeyMessage:
     return RemovePublicKeyMessage(
         version=1,
         signature_type=SignatureType.SECP256K1,
-        key_identifier=1,
+        managed_key_id=1,
         nonce=1,
         time=1_000_000,
         user_id=42,
@@ -24,7 +24,7 @@ def test_round_trip(dummy_signature_hex: str) -> None:
 
     assert reconstructed.version == original.version
     assert reconstructed.signature_type == original.signature_type
-    assert reconstructed.key_identifier == original.key_identifier
+    assert reconstructed.managed_key_id == original.managed_key_id
     assert reconstructed.nonce == original.nonce
     assert reconstructed.time == original.time
     assert reconstructed.user_id == original.user_id
@@ -35,14 +35,14 @@ def test_base_message_dispatch(dummy_signature_hex: str) -> None:
     original = _make_msg(dummy_signature_hex)
     dispatched = BaseMessage.from_bytes(original.to_bytes())
     assert isinstance(dispatched, RemovePublicKeyMessage)
-    assert dispatched.key_identifier == original.key_identifier
+    assert dispatched.managed_key_id == original.managed_key_id
 
 
 def test_secp256k1_sign_and_verify(private_key: PrivateKey) -> None:
     msg = RemovePublicKeyMessage(
         version=1,
         signature_type=SignatureType.SECP256K1,
-        key_identifier=1,
+        managed_key_id=1,
         nonce=1,
         time=1_000_000,
         user_id=1,
@@ -58,7 +58,7 @@ def test_ed25519_sign_and_verify(ed25519_keypair: Keypair) -> None:
     msg = RemovePublicKeyMessage(
         version=1,
         signature_type=SignatureType.ED25519,
-        key_identifier=2,
+        managed_key_id=2,
         nonce=2,
         time=1_000_000,
         user_id=5,

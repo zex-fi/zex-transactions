@@ -40,6 +40,9 @@ class RegisterMessage(BaseMessage):
         public_key: bytes,
         signature_hex: str | None = None,
     ) -> None:
+        if version not in (1, 2):
+            raise ValueError("Unsupported version.")
+
         self.user_id = -1
 
         self.referral_code = referral_code

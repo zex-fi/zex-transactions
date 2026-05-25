@@ -1,6 +1,7 @@
 import pytest
 from coincurve import PrivateKey
 from solders.keypair import Keypair
+
 from zex.transactions import LoginMessage
 from zex.transactions.exceptions import MessageValidationError
 from zex.utils.zex_types import SignatureType, TransactionType

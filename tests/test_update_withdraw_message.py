@@ -16,7 +16,6 @@ from zex.transactions.update_withdraw_message import (
 from zex.utils.zex_types import ChainName
 
 
-
 class TestUpdateWithdrawRoundTrip:
     def test_given_zero_hash_length_when_round_tripping_then_constructs_same_attributes(
         self,
@@ -405,7 +404,7 @@ class TestUpdateWithdrawMessageStr:
 
     def test_str_contains_status(self) -> None:
         msg = _build_message(status=UpdateWithdrawMessageStatus.REJECTED)
-        assert f"status: {UpdateWithdrawMessageStatus.REJECTED}" in str(msg)  
+        assert f"status: {UpdateWithdrawMessageStatus.REJECTED}" in str(msg)
 
     def test_str_contains_transaction_hash_length(self) -> None:
         withdraw = UpdatedWithdrawal(id=1, tx_hash=b"\x00" * 8)

@@ -13,7 +13,7 @@ def _make_permanent(
         version=1,
         signature_type=SignatureType.SECP256K1,
         key_signature_type=SignatureType.SECP256K1,
-        key_identifier=1,
+        managed_key_id=1,
         key_mode=KeyMode.PERMANENT,
         expiry=None,
         public_key=dummy_public_key_secp256k1,
@@ -34,7 +34,7 @@ def test_permanent_key_round_trip(
     assert reconstructed.version == original.version
     assert reconstructed.signature_type == original.signature_type
     assert reconstructed.key_signature_type == original.key_signature_type
-    assert reconstructed.key_identifier == original.key_identifier
+    assert reconstructed.managed_key_id == original.managed_key_id
     assert reconstructed.key_mode == original.key_mode
     assert reconstructed.expiry is None
     assert reconstructed.public_key == original.public_key
@@ -51,7 +51,7 @@ def test_temporary_key_round_trip(
         version=1,
         signature_type=SignatureType.SECP256K1,
         key_signature_type=SignatureType.SECP256K1,
-        key_identifier=99,
+        managed_key_id=99,
         key_mode=KeyMode.TEMPORARY,
         expiry=1_800_000_000,
         public_key=dummy_public_key_secp256k1,
@@ -65,7 +65,7 @@ def test_temporary_key_round_trip(
 
     assert reconstructed.key_mode == KeyMode.TEMPORARY
     assert reconstructed.expiry == 1_800_000_000
-    assert reconstructed.key_identifier == 99
+    assert reconstructed.managed_key_id == 99
     assert reconstructed.user_id == 7
 
 
@@ -77,7 +77,7 @@ def test_ed25519_secondary_key_round_trip(
         version=1,
         signature_type=SignatureType.SECP256K1,
         key_signature_type=SignatureType.ED25519,
-        key_identifier=5,
+        managed_key_id=5,
         key_mode=KeyMode.PERMANENT,
         expiry=None,
         public_key=ed25519_pubkey,
@@ -100,7 +100,7 @@ def test_base_message_dispatch(
     original = _make_permanent(dummy_signature_hex, dummy_public_key_secp256k1)
     dispatched = BaseMessage.from_bytes(original.to_bytes())
     assert isinstance(dispatched, AddPublicKeyMessage)
-    assert dispatched.key_identifier == original.key_identifier
+    assert dispatched.managed_key_id == original.managed_key_id
 
 
 def test_secp256k1_sign_and_verify(
@@ -110,7 +110,7 @@ def test_secp256k1_sign_and_verify(
         version=1,
         signature_type=SignatureType.SECP256K1,
         key_signature_type=SignatureType.SECP256K1,
-        key_identifier=1,
+        managed_key_id=1,
         key_mode=KeyMode.PERMANENT,
         expiry=None,
         public_key=dummy_public_key_secp256k1,
@@ -131,7 +131,7 @@ def test_ed25519_sign_and_verify(ed25519_keypair: Keypair) -> None:
         version=1,
         signature_type=SignatureType.ED25519,
         key_signature_type=SignatureType.ED25519,
-        key_identifier=2,
+        managed_key_id=2,
         key_mode=KeyMode.TEMPORARY,
         expiry=9_999_999_999,
         public_key=ed25519_pubkey,

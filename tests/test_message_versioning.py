@@ -16,7 +16,6 @@ from zex.transactions.add_public_key_message import AddPublicKeyMessage, KeyMode
 from zex.transactions.remove_public_key_message import RemovePublicKeyMessage
 from zex.utils.zex_types import ChainName, SignatureType
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -214,12 +213,14 @@ def test_transfer_v2_round_trip() -> None:
         nonce=None,
         user_id=1,
         signature_hex=DUMMY_SIG,
+        key_identifier=5,
     )
     reconstructed = TransferMessage.from_bytes(original.to_bytes())
 
     assert reconstructed.version == 2
     assert reconstructed.user_id == 1
     assert reconstructed.recipient_id == 99
+    assert reconstructed.key_identifier == 5
 
 
 def test_transfer_v2_nonce_raises() -> None:
@@ -234,6 +235,7 @@ def test_transfer_v2_nonce_raises() -> None:
         nonce=None,
         user_id=1,
         signature_hex=DUMMY_SIG,
+        key_identifier=5,
     )
     with pytest.raises(AttributeError):
         _ = msg.nonce
@@ -257,11 +259,13 @@ def test_withdraw_v2_round_trip() -> None:
         nonce=None,
         user_id=1,
         signature_hex=DUMMY_SIG,
+        key_identifier=5,
     )
     reconstructed = WithdrawMessage.from_bytes(original.to_bytes())
 
     assert reconstructed.version == 2
     assert reconstructed.destination_wallet == b"\x01\x23\x45"
+    assert reconstructed.key_identifier == 5
 
 
 def test_withdraw_v2_nonce_raises() -> None:
@@ -277,6 +281,7 @@ def test_withdraw_v2_nonce_raises() -> None:
         nonce=None,
         user_id=1,
         signature_hex=DUMMY_SIG,
+        key_identifier=5,
     )
     with pytest.raises(AttributeError):
         _ = msg.nonce
@@ -296,11 +301,13 @@ def test_pause_v2_round_trip() -> None:
         nonce=None,
         user_id=1,
         signature_hex=DUMMY_SIG,
+        key_identifier=5,
     )
     reconstructed = PauseWithdrawMessage.from_bytes(original.to_bytes())
 
     assert reconstructed.version == 2
     assert reconstructed.is_set is True
+    assert reconstructed.key_identifier == 5
 
 
 def test_pause_v2_nonce_raises() -> None:
@@ -312,6 +319,7 @@ def test_pause_v2_nonce_raises() -> None:
         nonce=None,
         user_id=1,
         signature_hex=DUMMY_SIG,
+        key_identifier=5,
     )
     with pytest.raises(AttributeError):
         _ = msg.nonce
@@ -327,7 +335,7 @@ def test_add_public_key_v2_permanent_round_trip() -> None:
         version=2,
         signature_type=SignatureType.SECP256K1,
         key_signature_type=SignatureType.SECP256K1,
-        key_identifier=10,
+        managed_key_id=10,
         key_mode=KeyMode.PERMANENT,
         expiry=None,
         public_key=SECP256K1_PUBKEY,
@@ -335,11 +343,13 @@ def test_add_public_key_v2_permanent_round_trip() -> None:
         time=1_000_000,
         user_id=42,
         signature_hex=DUMMY_SIG,
+        key_identifier=5,
     )
     reconstructed = AddPublicKeyMessage.from_bytes(original.to_bytes())
 
     assert reconstructed.version == 2
-    assert reconstructed.key_identifier == 10
+    assert reconstructed.managed_key_id == 10
+    assert reconstructed.key_identifier == 5
     assert reconstructed.key_mode == KeyMode.PERMANENT
     assert reconstructed.expiry is None
     assert reconstructed.public_key == SECP256K1_PUBKEY
@@ -350,7 +360,7 @@ def test_add_public_key_v2_temporary_round_trip() -> None:
         version=2,
         signature_type=SignatureType.SECP256K1,
         key_signature_type=SignatureType.SECP256K1,
-        key_identifier=11,
+        managed_key_id=11,
         key_mode=KeyMode.TEMPORARY,
         expiry=2_000_000_000,
         public_key=SECP256K1_PUBKEY,
@@ -358,12 +368,15 @@ def test_add_public_key_v2_temporary_round_trip() -> None:
         time=1_000_000,
         user_id=42,
         signature_hex=DUMMY_SIG,
+        key_identifier=5,
     )
     reconstructed = AddPublicKeyMessage.from_bytes(original.to_bytes())
 
     assert reconstructed.version == 2
     assert reconstructed.key_mode == KeyMode.TEMPORARY
     assert reconstructed.expiry == 2_000_000_000
+    assert reconstructed.managed_key_id == 11
+    assert reconstructed.key_identifier == 5
 
 
 def test_add_public_key_v2_nonce_raises() -> None:
@@ -371,7 +384,7 @@ def test_add_public_key_v2_nonce_raises() -> None:
         version=2,
         signature_type=SignatureType.SECP256K1,
         key_signature_type=SignatureType.SECP256K1,
-        key_identifier=10,
+        managed_key_id=10,
         key_mode=KeyMode.PERMANENT,
         expiry=None,
         public_key=SECP256K1_PUBKEY,
@@ -379,6 +392,7 @@ def test_add_public_key_v2_nonce_raises() -> None:
         time=1_000_000,
         user_id=42,
         signature_hex=DUMMY_SIG,
+        key_identifier=5,
     )
     with pytest.raises(AttributeError):
         _ = msg.nonce
@@ -393,16 +407,18 @@ def test_remove_public_key_v2_round_trip() -> None:
     original = RemovePublicKeyMessage(
         version=2,
         signature_type=SignatureType.SECP256K1,
-        key_identifier=10,
+        managed_key_id=10,
         nonce=None,
         time=1_000_000,
         user_id=42,
         signature_hex=DUMMY_SIG,
+        key_identifier=5,
     )
     reconstructed = RemovePublicKeyMessage.from_bytes(original.to_bytes())
 
     assert reconstructed.version == 2
-    assert reconstructed.key_identifier == 10
+    assert reconstructed.managed_key_id == 10
+    assert reconstructed.key_identifier == 5
     assert reconstructed.user_id == 42
 
 
@@ -410,11 +426,12 @@ def test_remove_public_key_v2_nonce_raises() -> None:
     msg = RemovePublicKeyMessage(
         version=2,
         signature_type=SignatureType.SECP256K1,
-        key_identifier=10,
+        managed_key_id=10,
         nonce=None,
         time=1_000_000,
         user_id=42,
         signature_hex=DUMMY_SIG,
+        key_identifier=5,
     )
     with pytest.raises(AttributeError):
         _ = msg.nonce

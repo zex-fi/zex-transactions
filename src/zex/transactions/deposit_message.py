@@ -49,6 +49,9 @@ class DepositMessage(BaseMessage):
         frost_signature: bytes | None = None,
         ecdsa_signature: bytes | None = None,
     ) -> None:
+        if version not in (1, 2):
+            raise ValueError("Unsupported version.")
+
         self.version = version
         self.chain = chain
         self.transaction_hash_length = transaction_hash_length
