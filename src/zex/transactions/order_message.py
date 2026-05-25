@@ -215,7 +215,7 @@ class OrderMessage(BaseMessage):
     def __str__(self) -> str:
         amount = format_decimal(Decimal(self.amount_mantissa) * 10 ** Decimal(self.amount_exponent))
         price = format_decimal(Decimal(self.price_mantissa) * 10 ** Decimal(self.price_exponent))
-        replay_field = (
+        nonce_or_time = (
             f"nonce: {self._nonce}"
             if self.version == 1
             else f"key_identifier: {self._key_identifier}"
@@ -228,7 +228,7 @@ class OrderMessage(BaseMessage):
             f"amount: {amount}\n"
             f"price: {price}\n"
             f"t: {self.time}\n"
-            f"{replay_field}\n"
+            f"{nonce_or_time}\n"
             f"user_id: {self.user_id}\n"
         )
 
