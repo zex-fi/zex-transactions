@@ -14,8 +14,6 @@ from zex.utils.zex_types import SignatureType, TransactionType
 
 
 class OrderMessage(BaseMessage):
-    # v1 header is 5 bytes; v2 header is 6 bytes (adds key_identifier_length).
-    # HEADER_LENGTH keeps the v1 (minimum) value so the existing guard still works.
     HEADER_LENGTH = 5
 
     def __init__(
