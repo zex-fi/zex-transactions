@@ -86,6 +86,8 @@ class PauseWithdrawMessage(BaseMessage):
             raise HeaderFormatError(f"Failed to unpack header: {e}") from e
         if command != cls.TRANSACTION_TYPE.value:
             raise UnexpectedCommandError("Unexpected command.")
+        if version not in (1, 2):
+            raise MessageFormatError("Unsupported version.")
 
         body_format = cls.get_body_format(version)
         body_size = calcsize(body_format)

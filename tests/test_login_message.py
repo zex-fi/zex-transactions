@@ -119,3 +119,31 @@ def test_wrong_hmac_length_raises() -> None:
             timestamp=1,
             hmac=b"\x00" * 16,
         )
+
+
+def test_version_validation_raises() -> None:
+    with pytest.raises(MessageValidationError):
+        LoginMessage(
+            version=3,
+            signature_type=SignatureType.SECP256K1,
+            public_key=b"\x02" * 33,
+            timestamp=1,
+            hmac=b"\x00" * 32,
+        )
+
+
+def test_v2_round_trip(private_key: PrivateKey) -> None:
+    msg = LoginMessage(
+        version=2,
+        signature_type=SignatureType.SECP256K1,
+        public_key=private_key.public_key.format(compressed=True),
+        timestamp=1_700_000_000,
+        hmac=b"\xab" * 32,
+        key_identifier=7,
+    )
+    msg.sign(private_key)
+    restored = LoginMessage.from_bytes(msg.to_bytes())
+    assert restored.version == 2
+    assert restored.key_identifier == 7
+    assert restored.timestamp == 1_700_000_000
+    assert restored.signature_hex == msg.signature_hex

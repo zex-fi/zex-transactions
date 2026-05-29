@@ -339,7 +339,6 @@ def test_add_public_key_v2_permanent_round_trip() -> None:
         key_mode=KeyMode.PERMANENT,
         expiry=None,
         public_key=SECP256K1_PUBKEY,
-        nonce=None,
         time=1_000_000,
         user_id=42,
         signature_hex=DUMMY_SIG,
@@ -364,7 +363,6 @@ def test_add_public_key_v2_temporary_round_trip() -> None:
         key_mode=KeyMode.TEMPORARY,
         expiry=2_000_000_000,
         public_key=SECP256K1_PUBKEY,
-        nonce=None,
         time=1_000_000,
         user_id=42,
         signature_hex=DUMMY_SIG,
@@ -379,25 +377,6 @@ def test_add_public_key_v2_temporary_round_trip() -> None:
     assert reconstructed.key_identifier == 5
 
 
-def test_add_public_key_v2_nonce_raises() -> None:
-    msg = AddPublicKeyMessage(
-        version=2,
-        signature_type=SignatureType.SECP256K1,
-        key_signature_type=SignatureType.SECP256K1,
-        managed_key_id=10,
-        key_mode=KeyMode.PERMANENT,
-        expiry=None,
-        public_key=SECP256K1_PUBKEY,
-        nonce=None,
-        time=1_000_000,
-        user_id=42,
-        signature_hex=DUMMY_SIG,
-        key_identifier=5,
-    )
-    with pytest.raises(AttributeError):
-        _ = msg.nonce
-
-
 # ---------------------------------------------------------------------------
 # RemovePublicKeyMessage v2
 # ---------------------------------------------------------------------------
@@ -408,7 +387,6 @@ def test_remove_public_key_v2_round_trip() -> None:
         version=2,
         signature_type=SignatureType.SECP256K1,
         managed_key_id=10,
-        nonce=None,
         time=1_000_000,
         user_id=42,
         signature_hex=DUMMY_SIG,
@@ -420,18 +398,3 @@ def test_remove_public_key_v2_round_trip() -> None:
     assert reconstructed.managed_key_id == 10
     assert reconstructed.key_identifier == 5
     assert reconstructed.user_id == 42
-
-
-def test_remove_public_key_v2_nonce_raises() -> None:
-    msg = RemovePublicKeyMessage(
-        version=2,
-        signature_type=SignatureType.SECP256K1,
-        managed_key_id=10,
-        nonce=None,
-        time=1_000_000,
-        user_id=42,
-        signature_hex=DUMMY_SIG,
-        key_identifier=5,
-    )
-    with pytest.raises(AttributeError):
-        _ = msg.nonce

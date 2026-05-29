@@ -111,6 +111,8 @@ class WithdrawMessage(BaseMessage):
             raise MessageFormatError("Invalid token length.")
         if destination_wallet_length == 0:
             raise MessageFormatError("Invalid destination address length.")
+        if version not in (1, 2):
+            raise MessageFormatError("Unsupported version.")
 
         body_format = cls.get_body_format(token_length, destination_wallet_length, version)
         body_size = calcsize(body_format)

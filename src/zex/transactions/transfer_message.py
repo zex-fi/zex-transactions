@@ -129,6 +129,8 @@ class TransferMessage(BaseMessage):
             raise UnexpectedCommandError("Unexpected command.")
         if token_length == 0:
             raise MessageFormatError("Invalid token length.")
+        if version not in (1, 2):
+            raise MessageFormatError("Unsupported version.")
 
         body_format = cls.get_body_format(token_length, version)
         body_size = calcsize(body_format)

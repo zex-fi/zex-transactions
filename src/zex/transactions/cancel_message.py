@@ -94,7 +94,7 @@ class CancelMessage(BaseMessage):
             raise HeaderFormatError(f"Failed to unpack header: {e}") from e
 
         if version not in (1, 2):
-            raise MessageFormatError(f"Unsupported message version: {version}")
+            raise MessageFormatError("Unsupported version.")
         if command != cls.TRANSACTION_TYPE.value:
             raise UnexpectedCommandError("Unexpected command.")
 
