@@ -13,6 +13,8 @@ from zexfrost.utils import get_curve
 from zex.transactions.base_message import BaseMessage
 from zex.transactions.exceptions import (
     HeaderFormatError,
+    MessageFormatError,
+    MessageValidationError,
     UnexpectedCommandError,
 )
 from zex.utils.zex_types import ChainName, TransactionType
@@ -49,6 +51,9 @@ class DepositMessage(BaseMessage):
         frost_signature: bytes | None = None,
         ecdsa_signature: bytes | None = None,
     ) -> None:
+        if version not in (1, 2):
+            raise MessageValidationError("Unsupported version.")
+
         self.version = version
         self.chain = chain
         self.transaction_hash_length = transaction_hash_length
@@ -91,6 +96,8 @@ class DepositMessage(BaseMessage):
             raise HeaderFormatError(f"Failed to unpack header: {e}") from e
         if command != cls.TRANSACTION_TYPE.value:
             raise UnexpectedCommandError("Unexpected command.")
+        if version not in (1, 2):
+            raise MessageFormatError("Unsupported version.")
 
         single_deposit_part1_format = cls.get_body_format_part1(
             transaction_hash_length, token_contract_length

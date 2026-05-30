@@ -7,6 +7,7 @@ from zex.transactions.base_message import BaseMessage
 from zex.transactions.exceptions import (
     HeaderFormatError,
     MessageFormatError,
+    MessageValidationError,
     UnexpectedCommandError,
 )
 from zex.utils.zex_types import SignatureType, TransactionType
@@ -40,6 +41,9 @@ class RegisterMessage(BaseMessage):
         public_key: bytes,
         signature_hex: str | None = None,
     ) -> None:
+        if version not in (1, 2):
+            raise MessageValidationError("Unsupported version.")
+
         self.user_id = -1
 
         self.referral_code = referral_code
@@ -65,6 +69,8 @@ class RegisterMessage(BaseMessage):
             raise HeaderFormatError(f"Failed to unpack header: {e}") from e
         if command != cls.TRANSACTION_TYPE.value:
             raise UnexpectedCommandError("Unexpected command.")
+        if version not in (1, 2):
+            raise MessageFormatError("Unsupported version.")
 
         try:
             sig_type = SignatureType.from_int(signature_type)

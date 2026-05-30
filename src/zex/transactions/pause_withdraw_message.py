@@ -7,6 +7,7 @@ from zex.transactions.base_message import BaseMessage
 from zex.transactions.exceptions import (
     HeaderFormatError,
     MessageFormatError,
+    MessageValidationError,
     UnexpectedCommandError,
 )
 from zex.utils.zex_types import SignatureType, TransactionType
@@ -22,32 +23,56 @@ class PauseWithdrawMessage(BaseMessage):
         signature_type: SignatureType,
         is_set: bool,
         time: int,
-        nonce: int,
+        nonce: int | None,
         user_id: int,
         signature_hex: str | None = None,
+        key_identifier: int | None = None,
     ) -> None:
+        if version not in (1, 2):
+            raise MessageValidationError("Unsupported version.")
+
         self.signature_type = signature_type
         self.validate_signature(signature_hex)
         self.signature_hex = signature_hex
         self.version = version
         self.time = time
         self.is_set = is_set
-        self.nonce = nonce
+        self._nonce = nonce
+        self._key_identifier = key_identifier
         self.user_id = user_id
 
+        if version == 1 and nonce is None:
+            raise MessageValidationError("nonce is required for v1 messages.")
+        if version == 2 and key_identifier is None:
+            raise MessageValidationError("key_identifier is required for v2 messages.")
+
         self._transaction_bytes: bytes | None = None
+
+    @property
+    def nonce(self) -> int:
+        if self._nonce is None:
+            raise AttributeError("nonce is not available in v2 messages; use time instead.")
+        return self._nonce
+
+    @property
+    def key_identifier(self) -> int:
+        if self._key_identifier is None:
+            raise AttributeError("key_identifier is not available in v1 messages.")
+        return self._key_identifier
 
     @classmethod
     def get_header_format(cls) -> str:
         return ">BBB"
 
     @classmethod
-    def get_body_format(cls) -> str:
+    def get_body_format(cls, version: int = 1) -> str:
+        # v1: is_set | time | nonce | user_id | sig
+        # v2: is_set | time | key_identifier | user_id | sig
         return f">BIIQ {cls.SIGNATURE_LENGTH}s"
 
     @classmethod
-    def get_format(cls) -> str:
-        return cls.get_header_format() + cls.get_body_format()[1:]
+    def get_format(cls, version: int = 1) -> str:
+        return cls.get_header_format() + cls.get_body_format(version)[1:]
 
     @classmethod
     def from_bytes(cls, transaction_bytes: bytes) -> PauseWithdrawMessage:
@@ -61,17 +86,30 @@ class PauseWithdrawMessage(BaseMessage):
             raise HeaderFormatError(f"Failed to unpack header: {e}") from e
         if command != cls.TRANSACTION_TYPE.value:
             raise UnexpectedCommandError("Unexpected command.")
+        if version not in (1, 2):
+            raise MessageFormatError("Unsupported version.")
 
-        body_format = cls.get_body_format()
+        body_format = cls.get_body_format(version)
         body_size = calcsize(body_format)
         if len(transaction_bytes) - cls.HEADER_LENGTH < body_size:
             raise MessageFormatError("Transaction body is too short.")
         body_bytes = transaction_bytes[cls.HEADER_LENGTH : cls.HEADER_LENGTH + body_size]
 
-        try:
-            is_set, time, nonce, user_id, signature_bytes = unpack(body_format, body_bytes)
-        except struct_error as e:
-            raise MessageFormatError(f"Failed to unpack body: {e}") from e
+        if version == 1:
+            try:
+                is_set, time, nonce, user_id, signature_bytes = unpack(body_format, body_bytes)
+            except struct_error as e:
+                raise MessageFormatError(f"Failed to unpack body: {e}") from e
+            key_identifier = None
+        else:  # v2
+            try:
+                is_set, time, key_identifier, user_id, signature_bytes = unpack(
+                    body_format, body_bytes
+                )
+            except struct_error as e:
+                raise MessageFormatError(f"Failed to unpack body: {e}") from e
+            nonce = None
+
         if is_set not in (0, 1):
             raise MessageFormatError("Incorrect value for is_set argument.")
 
@@ -88,35 +126,50 @@ class PauseWithdrawMessage(BaseMessage):
             nonce=nonce,
             user_id=user_id,
             signature_hex=signature_bytes.hex(),
+            key_identifier=key_identifier,
         )
         pause_withdraw_message._transaction_bytes = transaction_bytes
         return pause_withdraw_message
 
     def __str__(self) -> str:
-        return (
-            f"v: {self.version}\n"
-            "name: pause withdraw\n"
-            f"is set: {self.is_set}\n"
-            f"t: {self.time}\n"
-            f"nonce: {self.nonce}\n"
-            f"user_id: {self.user_id}\n"
-        )
+        parts = [
+            f"v: {self.version}",
+            "name: pause withdraw",
+            f"is set: {self.is_set}",
+            f"t: {self.time}",
+        ]
+        if self.version == 1:
+            parts.append(f"nonce: {self._nonce}")
+        parts.append(f"user_id: {self.user_id}")
+        return "\n".join(parts) + "\n"
 
     def to_bytes(self) -> bytes:
         if self._transaction_bytes is not None:
             return self._transaction_bytes
         assert self.signature_hex is not None
-        transaction_bytes = pack(
-            PauseWithdrawMessage.get_format(),
-            #
-            self.version,
-            PauseWithdrawMessage.TRANSACTION_TYPE.value,
-            self.signature_type.value,
-            self.is_set,
-            self.time,
-            self.nonce,
-            self.user_id,
-            bytes.fromhex(self.signature_hex),
-        )
+        if self.version == 1:
+            transaction_bytes = pack(
+                PauseWithdrawMessage.get_format(version=1),
+                self.version,
+                PauseWithdrawMessage.TRANSACTION_TYPE.value,
+                self.signature_type.value,
+                self.is_set,
+                self.time,
+                self._nonce,
+                self.user_id,
+                bytes.fromhex(self.signature_hex),
+            )
+        else:  # version == 2
+            transaction_bytes = pack(
+                PauseWithdrawMessage.get_format(version=2),
+                self.version,
+                PauseWithdrawMessage.TRANSACTION_TYPE.value,
+                self.signature_type.value,
+                self.is_set,
+                self.time,
+                self._key_identifier,
+                self.user_id,
+                bytes.fromhex(self.signature_hex),
+            )
         self._transaction_bytes = transaction_bytes
         return transaction_bytes

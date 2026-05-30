@@ -16,7 +16,6 @@ from zex.transactions.update_withdraw_message import (
 from zex.utils.zex_types import ChainName
 
 
-
 class TestUpdateWithdrawRoundTrip:
     def test_given_zero_hash_length_when_round_tripping_then_constructs_same_attributes(
         self,
@@ -183,9 +182,9 @@ class TestUpdateWithdrawMessageFromBytes:
     def test_given_valid_single_withdraw_when_calling_from_bytes_then_returns_correct_version(
         self,
     ) -> None:
-        data = _build_transaction_bytes(version=3, frost_sig=self.FROST_SIG, ecdsa_sig=self.ECDSA_SIG)
+        data = _build_transaction_bytes(version=1, frost_sig=self.FROST_SIG, ecdsa_sig=self.ECDSA_SIG)
         msg = UpdateWithdrawMessage.from_bytes(data)
-        assert msg.version == 3
+        assert msg.version == 1
 
     def test_given_rejected_message_when_calling_from_bytes_then_status_is_rejected(
         self,
@@ -350,7 +349,7 @@ class TestUpdateWithdrawMessageInit:
         frost = b"\xaa" * 65
         ecdsa = b"\xbb" * 65
         msg = UpdateWithdrawMessage(
-            version=7,
+            version=2,
             chain=ChainName.Ethereum,
             status=UpdateWithdrawMessageStatus.SUCCESSFUL,
             transaction_hash_length=4,
@@ -358,7 +357,7 @@ class TestUpdateWithdrawMessageInit:
             frost_signature=frost,
             ecdsa_signature=ecdsa,
         )
-        assert msg.version == 7
+        assert msg.version == 2
         assert msg.status == UpdateWithdrawMessageStatus.SUCCESSFUL
         assert msg.frost_signature == frost
         assert msg.ecdsa_signature == ecdsa
@@ -400,12 +399,12 @@ class TestUpdateWithdrawMessageFormatMethods:
 
 class TestUpdateWithdrawMessageStr:
     def test_str_contains_version(self) -> None:
-        msg = _build_message(version=42)
-        assert "42" in str(msg)
+        msg = _build_message(version=2)
+        assert "version: 2" in str(msg)
 
     def test_str_contains_status(self) -> None:
         msg = _build_message(status=UpdateWithdrawMessageStatus.REJECTED)
-        assert f"status: {UpdateWithdrawMessageStatus.REJECTED}" in str(msg)  
+        assert f"status: {UpdateWithdrawMessageStatus.REJECTED}" in str(msg)
 
     def test_str_contains_transaction_hash_length(self) -> None:
         withdraw = UpdatedWithdrawal(id=1, tx_hash=b"\x00" * 8)
@@ -462,7 +461,7 @@ class TestUpdateWithdrawMessageRoundTrip:
     def test_given_successful_message_when_round_tripping_then_fields_match(self) -> None:
         # Given
         original = _build_message(
-            version=3,
+            version=2,
             status=UpdateWithdrawMessageStatus.SUCCESSFUL,
             withdraws=[UpdatedWithdrawal(id=42, tx_hash=b"\xde\xad\xbe\xef")],
             frost_sig=self.FROST_SIG,
@@ -499,7 +498,7 @@ class TestUpdateWithdrawMessageRoundTrip:
     ) -> None:
         # Given
         data = _build_transaction_bytes(
-            version=5,
+            version=1,
             status=UpdateWithdrawMessageStatus.SUCCESSFUL,
             withdraws=[UpdatedWithdrawal(id=123, tx_hash=b"\xca\xfe\xba\xbe")],
             frost_sig=self.FROST_SIG,
@@ -523,7 +522,7 @@ class TestUpdateWithdrawMessageRoundTrip:
     ) -> None:
         # Given
         data = _build_transaction_bytes(
-            version=5,
+            version=1,
             status=UpdateWithdrawMessageStatus.SUCCESSFUL,
             withdraws=[UpdatedWithdrawal(id=123, tx_hash=b"\xca\xfe\xba\xbe")],
             frost_sig=self.FROST_SIG,

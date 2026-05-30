@@ -49,7 +49,11 @@ class LoginMessage(BaseMessage):
         timestamp: int,
         hmac: bytes,
         signature_hex: str | None = None,
+        key_identifier: int | None = None,
     ) -> None:
+        if version not in (1, 2):
+            raise MessageValidationError("Unsupported version.")
+
         self.user_id = -1
 
         self.version = version
@@ -75,10 +79,21 @@ class LoginMessage(BaseMessage):
             )
         self.hmac = hmac
 
+        self._key_identifier = key_identifier
+
+        if version == 2 and key_identifier is None:
+            raise MessageValidationError("key_identifier is required for v2 messages.")
+
         self.validate_signature(signature_hex)
         self.signature_hex = signature_hex
 
         self._transaction_bytes: bytes | None = None
+
+    @property
+    def key_identifier(self) -> int:
+        if self._key_identifier is None:
+            raise AttributeError("key_identifier is not available in v1 messages.")
+        return self._key_identifier
 
     @classmethod
     def from_bytes(cls, transaction_bytes: bytes) -> "LoginMessage":
@@ -91,6 +106,8 @@ class LoginMessage(BaseMessage):
             raise HeaderFormatError(f"Failed to unpack header: {e}") from e
         if command != cls.TRANSACTION_TYPE.value:
             raise UnexpectedCommandError("Unexpected command.")
+        if version not in (1, 2):
+            raise MessageFormatError("Unsupported version.")
 
         try:
             sig_type = SignatureType.from_int(signature_type)
@@ -100,21 +117,25 @@ class LoginMessage(BaseMessage):
         if public_key_length is None:
             raise MessageFormatError(f"Unsupported signature type: {sig_type}.")
 
-        body_format = cls.get_body_format(public_key_length)
+        body_format = cls.get_body_format(public_key_length, version)
         body_size = calcsize(body_format)
         if len(transaction_bytes) - cls.HEADER_LENGTH < body_size:
             raise MessageFormatError("Transaction body is too short.")
         body_bytes = transaction_bytes[cls.HEADER_LENGTH : cls.HEADER_LENGTH + body_size]
 
-        try:
-            (
-                public_key,
-                timestamp,
-                hmac,
-                signature_bytes,
-            ) = unpack(body_format, body_bytes)
-        except struct_error as e:
-            raise MessageFormatError(f"Failed to unpack body: {e}") from e
+        if version == 1:
+            try:
+                public_key, timestamp, hmac, signature_bytes = unpack(body_format, body_bytes)
+            except struct_error as e:
+                raise MessageFormatError(f"Failed to unpack body: {e}") from e
+            key_identifier = None
+        else:  # v2
+            try:
+                public_key, timestamp, hmac, key_identifier, signature_bytes = unpack(
+                    body_format, body_bytes
+                )
+            except struct_error as e:
+                raise MessageFormatError(f"Failed to unpack body: {e}") from e
 
         login_message = cls(
             version=version,
@@ -123,6 +144,7 @@ class LoginMessage(BaseMessage):
             timestamp=timestamp,
             hmac=hmac,
             signature_hex=signature_bytes.hex(),
+            key_identifier=key_identifier,
         )
         login_message._transaction_bytes = transaction_bytes
         return login_message
@@ -132,36 +154,55 @@ class LoginMessage(BaseMessage):
         return ">BBB"
 
     @classmethod
-    def get_body_format(cls, public_key_length: int) -> str:
-        return f">{public_key_length}s Q {cls.HMAC_LENGTH}s {cls.SIGNATURE_LENGTH}s"
+    def get_body_format(cls, public_key_length: int, version: int = 1) -> str:
+        base = f">{public_key_length}s Q {cls.HMAC_LENGTH}s"
+        if version == 2:
+            return base + f" I {cls.SIGNATURE_LENGTH}s"
+        return base + f" {cls.SIGNATURE_LENGTH}s"
 
     @classmethod
-    def get_format(cls, public_key_length: int) -> str:
-        return cls.get_header_format() + cls.get_body_format(public_key_length)[1:]
+    def get_format(cls, public_key_length: int, version: int = 1) -> str:
+        return cls.get_header_format() + cls.get_body_format(public_key_length, version)[1:]
 
     def __str__(self) -> str:
-        return (
-            f"v: {self.version}\n"
-            "name: login\n"
-            f"public_key: {self.public_key.hex()}\n"
-            f"t: {self.timestamp}\n"
-            f"hmac: {self.hmac.hex()}\n"
-        )
+        parts = [
+            f"v: {self.version}",
+            "name: login",
+            f"public_key: {self.public_key.hex()}",
+            f"t: {self.timestamp}",
+            f"hmac: {self.hmac.hex()}",
+        ]
+        if self.version == 2:
+            parts.append(f"key_identifier: {self._key_identifier}")
+        return "\n".join(parts) + "\n"
 
     def to_bytes(self) -> bytes:
         if self._transaction_bytes is not None:
             return self._transaction_bytes
         assert self.signature_hex is not None
-        transaction_bytes = pack(
-            LoginMessage.get_format(public_key_length=len(self.public_key)),
-            #
-            self.version,
-            LoginMessage.TRANSACTION_TYPE.value,
-            self.signature_type.value,
-            self.public_key,
-            self.timestamp,
-            self.hmac,
-            bytes.fromhex(self.signature_hex),
-        )
+        fmt = LoginMessage.get_format(public_key_length=len(self.public_key), version=self.version)
+        if self.version == 1:
+            transaction_bytes = pack(
+                fmt,
+                self.version,
+                LoginMessage.TRANSACTION_TYPE.value,
+                self.signature_type.value,
+                self.public_key,
+                self.timestamp,
+                self.hmac,
+                bytes.fromhex(self.signature_hex),
+            )
+        else:  # version == 2
+            transaction_bytes = pack(
+                fmt,
+                self.version,
+                LoginMessage.TRANSACTION_TYPE.value,
+                self.signature_type.value,
+                self.public_key,
+                self.timestamp,
+                self.hmac,
+                self._key_identifier,
+                bytes.fromhex(self.signature_hex),
+            )
         self._transaction_bytes = transaction_bytes
         return transaction_bytes

@@ -1,8 +1,9 @@
-from zex.transactions import DepositMessage, Deposit
-from zex.utils.zex_types import ChainName
 from coincurve import PrivateKey
-from frost_lib.curves import secp256k1 as curve
 from eth_account import Account
+from frost_lib.curves import secp256k1 as curve
+
+from zex.transactions import Deposit, DepositMessage
+from zex.utils.zex_types import ChainName
 
 
 def test_given_output_of_to_bytes_when_calling_from_bytes_then_construct_the_same_attributes() -> None:
