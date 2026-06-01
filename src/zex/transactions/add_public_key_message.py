@@ -158,9 +158,7 @@ class AddPublicKeyMessage(BaseMessage):
         ]
         if self.key_mode == KeyMode.TEMPORARY:
             args.append(self.expiry)
-        args.extend(
-            [self.time, self.user_id, bytes.fromhex(self.signature_hex)]
-        )
+        args.extend([self.time, self.user_id, bytes.fromhex(self.signature_hex)])
 
         self._transaction_bytes = pack(fmt, *args)
         return self._transaction_bytes
@@ -210,8 +208,8 @@ class AddPublicKeyMessage(BaseMessage):
 
         try:
             if key_mode == KeyMode.TEMPORARY:
-                managed_key_id, pub_key, km, expiry, time, user_id, sig_bytes = (
-                    unpack(body_format, body_bytes)
+                managed_key_id, pub_key, km, expiry, time, user_id, sig_bytes = unpack(
+                    body_format, body_bytes
                 )
             else:  # PERMANENT
                 managed_key_id, pub_key, km, time, user_id, sig_bytes = unpack(

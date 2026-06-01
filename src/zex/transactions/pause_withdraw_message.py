@@ -93,9 +93,7 @@ class PauseWithdrawMessage(BaseMessage):
                 raise MessageFormatError(f"Failed to unpack body: {e}") from e
         else:  # v2
             try:
-                is_set, time, nonce, user_id, signature_bytes = unpack(
-                    body_format, body_bytes
-                )
+                is_set, time, nonce, user_id, signature_bytes = unpack(body_format, body_bytes)
             except struct_error as e:
                 raise MessageFormatError(f"Failed to unpack body: {e}") from e
 

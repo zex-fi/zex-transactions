@@ -128,9 +128,7 @@ class RemovePublicKeyMessage(BaseMessage):
         body_bytes = transaction_bytes[cls.HEADER_LENGTH : cls.HEADER_LENGTH + body_size]
 
         try:
-            managed_key_id, time, user_id, signature_bytes = unpack(
-                body_format, body_bytes
-            )
+            managed_key_id, time, user_id, signature_bytes = unpack(body_format, body_bytes)
         except struct_error as e:
             raise MessageFormatError(f"Failed to unpack body: {e}") from e
 
