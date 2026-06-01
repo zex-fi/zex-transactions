@@ -18,7 +18,6 @@ class RemovePublicKeySchema(BaseModel):
     managed_key_id: int
     time: int
     user_id: int
-    key_identifier: int
     signature: str
 
     def to_message(self) -> "RemovePublicKeyMessage":
@@ -28,7 +27,6 @@ class RemovePublicKeySchema(BaseModel):
             managed_key_id=self.managed_key_id,
             time=self.time,
             user_id=self.user_id,
-            key_identifier=self.key_identifier,
             signature_hex=self.signature,
         )
 
@@ -55,7 +53,6 @@ class RemovePublicKeyMessage(BaseMessage):
         managed_key_id: int,
         time: int,
         user_id: int,
-        key_identifier: int,
         signature_hex: str | None = None,
     ) -> None:
         if version != 2:
@@ -66,7 +63,6 @@ class RemovePublicKeyMessage(BaseMessage):
         self.managed_key_id = managed_key_id
         self.time = time
         self.user_id = user_id
-        self.key_identifier = key_identifier
 
         self.validate_signature(signature_hex)
         self.signature_hex = signature_hex
@@ -78,8 +74,8 @@ class RemovePublicKeyMessage(BaseMessage):
 
     @classmethod
     def get_body_format(cls) -> str:
-        # managed_key_id | time | key_identifier | user_id | sig
-        return f">I I I Q {cls.SIGNATURE_LENGTH}s"
+        # managed_key_id | time(Q) | user_id | sig
+        return f">I Q Q {cls.SIGNATURE_LENGTH}s"
 
     @classmethod
     def get_format(cls) -> str:
@@ -91,7 +87,6 @@ class RemovePublicKeyMessage(BaseMessage):
             "name: remove_public_key\n"
             f"user_id: {self.user_id}\n"
             f"managed_key_id: {self.managed_key_id}\n"
-            f"key_identifier: {self.key_identifier}\n"
             f"time: {self.time}\n"
         )
 
@@ -106,7 +101,6 @@ class RemovePublicKeyMessage(BaseMessage):
             self.signature_type.value,
             self.managed_key_id,
             self.time,
-            self.key_identifier,
             self.user_id,
             bytes.fromhex(self.signature_hex),
         )
@@ -134,9 +128,7 @@ class RemovePublicKeyMessage(BaseMessage):
         body_bytes = transaction_bytes[cls.HEADER_LENGTH : cls.HEADER_LENGTH + body_size]
 
         try:
-            managed_key_id, time, key_identifier, user_id, signature_bytes = unpack(
-                body_format, body_bytes
-            )
+            managed_key_id, time, user_id, signature_bytes = unpack(body_format, body_bytes)
         except struct_error as e:
             raise MessageFormatError(f"Failed to unpack body: {e}") from e
 
@@ -146,7 +138,6 @@ class RemovePublicKeyMessage(BaseMessage):
             managed_key_id=managed_key_id,
             time=time,
             user_id=user_id,
-            key_identifier=key_identifier,
             signature_hex=signature_bytes.hex(),
         )
         message._transaction_bytes = transaction_bytes

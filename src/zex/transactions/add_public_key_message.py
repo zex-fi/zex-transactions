@@ -28,7 +28,6 @@ class AddPublicKeySchema(BaseModel):
     public_key: bytes
     time: int
     user_id: int
-    key_identifier: int
     signature: str
 
     def to_message(self) -> "AddPublicKeyMessage":
@@ -42,7 +41,6 @@ class AddPublicKeySchema(BaseModel):
             public_key=self.public_key,
             time=self.time,
             user_id=self.user_id,
-            key_identifier=self.key_identifier,
             signature_hex=self.signature,
         )
 
@@ -78,7 +76,6 @@ class AddPublicKeyMessage(BaseMessage):
         public_key: bytes,
         time: int,
         user_id: int,
-        key_identifier: int,
         signature_hex: str | None = None,
     ) -> None:
         if version != 2:
@@ -93,7 +90,6 @@ class AddPublicKeyMessage(BaseMessage):
         self.public_key = public_key
         self.time = time
         self.user_id = user_id
-        self.key_identifier = key_identifier
 
         if key_mode == KeyMode.TEMPORARY and expiry is None:
             raise MessageValidationError("expiry is required for temporary keys.")
@@ -116,11 +112,11 @@ class AddPublicKeyMessage(BaseMessage):
         """
         prefix = f">I {public_key_length}s B"
         if key_mode == KeyMode.TEMPORARY:
-            # expiry, time, key_identifier, user_id, sig
-            suffix = f"I I I Q {cls.SIGNATURE_LENGTH}s"
+            # expiry(I), time(Q), user_id, sig
+            suffix = f"I Q Q {cls.SIGNATURE_LENGTH}s"
         else:
-            # time, key_identifier, user_id, sig
-            suffix = f"I I Q {cls.SIGNATURE_LENGTH}s"
+            # time(Q), user_id, sig
+            suffix = f"Q Q {cls.SIGNATURE_LENGTH}s"
         return f"{prefix} {suffix}"
 
     @classmethod
@@ -139,7 +135,6 @@ class AddPublicKeyMessage(BaseMessage):
         if self.key_mode == KeyMode.TEMPORARY:
             parts.append(f"expiry: {self.expiry}")
         parts += [
-            f"key_identifier: {self.key_identifier}",
             f"time: {self.time}",
             f"public_key: {self.public_key.hex()}",
         ]
@@ -163,9 +158,7 @@ class AddPublicKeyMessage(BaseMessage):
         ]
         if self.key_mode == KeyMode.TEMPORARY:
             args.append(self.expiry)
-        args.extend(
-            [self.time, self.key_identifier, self.user_id, bytes.fromhex(self.signature_hex)]
-        )
+        args.extend([self.time, self.user_id, bytes.fromhex(self.signature_hex)])
 
         self._transaction_bytes = pack(fmt, *args)
         return self._transaction_bytes
@@ -215,11 +208,11 @@ class AddPublicKeyMessage(BaseMessage):
 
         try:
             if key_mode == KeyMode.TEMPORARY:
-                managed_key_id, pub_key, km, expiry, time, key_identifier, user_id, sig_bytes = (
-                    unpack(body_format, body_bytes)
+                managed_key_id, pub_key, km, expiry, time, user_id, sig_bytes = unpack(
+                    body_format, body_bytes
                 )
             else:  # PERMANENT
-                managed_key_id, pub_key, km, time, key_identifier, user_id, sig_bytes = unpack(
+                managed_key_id, pub_key, km, time, user_id, sig_bytes = unpack(
                     body_format, body_bytes
                 )
                 expiry = None
@@ -236,7 +229,6 @@ class AddPublicKeyMessage(BaseMessage):
             public_key=pub_key,
             time=time,
             user_id=user_id,
-            key_identifier=key_identifier,
             signature_hex=sig_bytes.hex(),
         )
         message._transaction_bytes = transaction_bytes

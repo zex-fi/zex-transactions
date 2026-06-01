@@ -26,7 +26,6 @@ class PauseWithdrawMessage(BaseMessage):
         nonce: int | None,
         user_id: int,
         signature_hex: str | None = None,
-        key_identifier: int | None = None,
     ) -> None:
         if version not in (1, 2):
             raise MessageValidationError("Unsupported version.")
@@ -38,27 +37,18 @@ class PauseWithdrawMessage(BaseMessage):
         self.time = time
         self.is_set = is_set
         self._nonce = nonce
-        self._key_identifier = key_identifier
         self.user_id = user_id
 
         if version == 1 and nonce is None:
             raise MessageValidationError("nonce is required for v1 messages.")
-        if version == 2 and key_identifier is None:
-            raise MessageValidationError("key_identifier is required for v2 messages.")
 
         self._transaction_bytes: bytes | None = None
 
     @property
     def nonce(self) -> int:
         if self._nonce is None:
-            raise AttributeError("nonce is not available in v2 messages; use time instead.")
+            raise AttributeError("nonce is not available in v2 messages.")
         return self._nonce
-
-    @property
-    def key_identifier(self) -> int:
-        if self._key_identifier is None:
-            raise AttributeError("key_identifier is not available in v1 messages.")
-        return self._key_identifier
 
     @classmethod
     def get_header_format(cls) -> str:
@@ -66,8 +56,10 @@ class PauseWithdrawMessage(BaseMessage):
 
     @classmethod
     def get_body_format(cls, version: int = 1) -> str:
-        # v1: is_set | time | nonce | user_id | sig
-        # v2: is_set | time | key_identifier | user_id | sig
+        # v1: is_set | time(I) | nonce(I) | user_id | sig
+        # v2: is_set | time(Q) | user_id | sig
+        if version == 2:
+            return f">BQQ {cls.SIGNATURE_LENGTH}s"
         return f">BIIQ {cls.SIGNATURE_LENGTH}s"
 
     @classmethod
@@ -100,12 +92,9 @@ class PauseWithdrawMessage(BaseMessage):
                 is_set, time, nonce, user_id, signature_bytes = unpack(body_format, body_bytes)
             except struct_error as e:
                 raise MessageFormatError(f"Failed to unpack body: {e}") from e
-            key_identifier = None
         else:  # v2
             try:
-                is_set, time, key_identifier, user_id, signature_bytes = unpack(
-                    body_format, body_bytes
-                )
+                is_set, time, user_id, signature_bytes = unpack(body_format, body_bytes)
             except struct_error as e:
                 raise MessageFormatError(f"Failed to unpack body: {e}") from e
             nonce = None
@@ -126,7 +115,6 @@ class PauseWithdrawMessage(BaseMessage):
             nonce=nonce,
             user_id=user_id,
             signature_hex=signature_bytes.hex(),
-            key_identifier=key_identifier,
         )
         pause_withdraw_message._transaction_bytes = transaction_bytes
         return pause_withdraw_message
@@ -167,7 +155,6 @@ class PauseWithdrawMessage(BaseMessage):
                 self.signature_type.value,
                 self.is_set,
                 self.time,
-                self._key_identifier,
                 self.user_id,
                 bytes.fromhex(self.signature_hex),
             )
