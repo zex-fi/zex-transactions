@@ -202,6 +202,18 @@ class OrderMessage(BaseMessage):
     def __str__(self) -> str:
         amount = format_decimal(Decimal(self.amount_mantissa) * 10 ** Decimal(self.amount_exponent))
         price = format_decimal(Decimal(self.price_mantissa) * 10 ** Decimal(self.price_exponent))
+        if self.version == 1:
+            return (
+                f"v: {self.version}\n"
+                f"name: {'buy' if self.TRANSACTION_TYPE == TransactionType.BUY else 'sell'}\n"
+                f"base token: {self.base_token}\n"
+                f"quote token: {self.quote_token}\n"
+                f"amount: {amount}\n"
+                f"price: {price}\n"
+                f"t: {self.time}\n"
+                f"nonce: {self._nonce}\n"
+                f"user_id: {self.user_id}\n"
+            )
         return (
             f"v: {self.version}\n"
             f"name: {'buy' if self.TRANSACTION_TYPE == TransactionType.BUY else 'sell'}\n"
@@ -210,7 +222,6 @@ class OrderMessage(BaseMessage):
             f"amount: {amount}\n"
             f"price: {price}\n"
             f"t: {self.time}\n"
-            f"nonce: {self._nonce}\n"
             f"user_id: {self.user_id}\n"
         )
 
