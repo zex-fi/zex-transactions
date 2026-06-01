@@ -1,6 +1,4 @@
-"""Tests for v2 message format: key_identifier in buy/sell/cancel, nonce-free body
-for all other nonce-bearing messages.
-"""
+"""Tests for v2 message format: time field is 8 bytes (u64) instead of 4 bytes (u32)."""
 import pytest
 from coincurve import PrivateKey
 
@@ -13,6 +11,7 @@ from zex.transactions import (
     WithdrawMessage,
 )
 from zex.transactions.add_public_key_message import AddPublicKeyMessage, KeyMode
+from zex.transactions.exceptions import MessageValidationError
 from zex.transactions.remove_public_key_message import RemovePublicKeyMessage
 from zex.utils.zex_types import ChainName, SignatureType
 
@@ -38,10 +37,9 @@ def _make_buy_v2(sig: str | None = DUMMY_SIG) -> BuyMessage:
         price_mantissa=5,
         price_exponent=4,
         time=10_000,
-        nonce=None,
+        nonce=7,
         user_id=1,
         signature_hex=sig,
-        key_identifier=42,
     )
 
 
@@ -52,7 +50,6 @@ def _make_cancel_v2(sig: str | None = DUMMY_SIG) -> CancelMessage:
         order_nonce=42,
         user_id=7,
         signature_hex=sig,
-        key_identifier=3,
     )
 
 
@@ -66,7 +63,7 @@ def test_buy_v2_round_trip() -> None:
     reconstructed = BuyMessage.from_bytes(original.to_bytes())
 
     assert reconstructed.version == 2
-    assert reconstructed.key_identifier == 42
+    assert reconstructed.nonce == 7
     assert reconstructed.base_token == "BTC"
     assert reconstructed.quote_token == "USDT"
     assert reconstructed.time == 10_000
@@ -74,33 +71,8 @@ def test_buy_v2_round_trip() -> None:
     assert reconstructed.signature_hex == DUMMY_SIG
 
 
-def test_buy_v2_nonce_raises() -> None:
-    msg = _make_buy_v2()
-    with pytest.raises(AttributeError, match="v2"):
-        _ = msg.nonce
-
-
-def test_buy_v1_key_identifier_raises(dummy_signature_hex: str) -> None:
-    msg = BuyMessage(
-        version=1,
-        signature_type=SignatureType.SECP256K1,
-        base_token="BTC",
-        quote_token="USDT",
-        amount_mantissa=1,
-        amount_exponent=0,
-        price_mantissa=5,
-        price_exponent=4,
-        time=10_000,
-        nonce=7,
-        user_id=1,
-        signature_hex=dummy_signature_hex,
-    )
-    with pytest.raises(AttributeError, match="v1"):
-        _ = msg.key_identifier
-
-
-def test_buy_v2_requires_key_identifier() -> None:
-    with pytest.raises(Exception):
+def test_buy_v2_requires_nonce() -> None:
+    with pytest.raises(MessageValidationError):
         BuyMessage(
             version=2,
             signature_type=SignatureType.SECP256K1,
@@ -114,7 +86,6 @@ def test_buy_v2_requires_key_identifier() -> None:
             nonce=None,
             user_id=1,
             signature_hex=DUMMY_SIG,
-            key_identifier=None,
         )
 
 
@@ -145,15 +116,14 @@ def test_sell_v2_round_trip() -> None:
         price_mantissa=3,
         price_exponent=3,
         time=20_000,
-        nonce=None,
+        nonce=9,
         user_id=5,
         signature_hex=DUMMY_SIG,
-        key_identifier=7,
     )
     reconstructed = SellMessage.from_bytes(original.to_bytes())
 
     assert reconstructed.version == 2
-    assert reconstructed.key_identifier == 7
+    assert reconstructed.nonce == 9
     assert reconstructed.user_id == 5
 
 
@@ -169,25 +139,12 @@ def test_cancel_v2_round_trip() -> None:
     assert reconstructed.version == 2
     assert reconstructed.order_nonce == 42
     assert reconstructed.user_id == 7
-    assert reconstructed.key_identifier == 3
     assert reconstructed.signature_hex == DUMMY_SIG
 
 
 def test_cancel_v2_order_nonce_accessible() -> None:
     msg = _make_cancel_v2()
     assert msg.order_nonce == 42
-
-
-def test_cancel_v1_key_identifier_raises(dummy_signature_hex: str) -> None:
-    msg = CancelMessage(
-        version=1,
-        signature_type=SignatureType.SECP256K1,
-        order_nonce=1,
-        user_id=1,
-        signature_hex=dummy_signature_hex,
-    )
-    with pytest.raises(AttributeError, match="v1"):
-        _ = msg.key_identifier
 
 
 def test_cancel_v2_sign_and_verify(private_key: PrivateKey) -> None:
@@ -210,35 +167,16 @@ def test_transfer_v2_round_trip() -> None:
         amount_exponent=0,
         recipient_id=99,
         time=1_000,
-        nonce=None,
+        nonce=5,
         user_id=1,
         signature_hex=DUMMY_SIG,
-        key_identifier=5,
     )
     reconstructed = TransferMessage.from_bytes(original.to_bytes())
 
     assert reconstructed.version == 2
     assert reconstructed.user_id == 1
     assert reconstructed.recipient_id == 99
-    assert reconstructed.key_identifier == 5
-
-
-def test_transfer_v2_nonce_raises() -> None:
-    msg = TransferMessage(
-        version=2,
-        signature_type=SignatureType.SECP256K1,
-        token_name="BTC",
-        amount_mantissa=1,
-        amount_exponent=0,
-        recipient_id=99,
-        time=1_000,
-        nonce=None,
-        user_id=1,
-        signature_hex=DUMMY_SIG,
-        key_identifier=5,
-    )
-    with pytest.raises(AttributeError):
-        _ = msg.nonce
+    assert reconstructed.nonce == 5
 
 
 # ---------------------------------------------------------------------------
@@ -256,35 +194,15 @@ def test_withdraw_v2_round_trip() -> None:
         amount_exponent=0,
         destination_wallet=b"\x01\x23\x45",
         time=1_000,
-        nonce=None,
+        nonce=5,
         user_id=1,
         signature_hex=DUMMY_SIG,
-        key_identifier=5,
     )
     reconstructed = WithdrawMessage.from_bytes(original.to_bytes())
 
     assert reconstructed.version == 2
     assert reconstructed.destination_wallet == b"\x01\x23\x45"
-    assert reconstructed.key_identifier == 5
-
-
-def test_withdraw_v2_nonce_raises() -> None:
-    msg = WithdrawMessage(
-        version=2,
-        signature_type=SignatureType.SECP256K1,
-        token_name="BTC",
-        chain_name=ChainName.Bitcoin,
-        amount_mantissa=1,
-        amount_exponent=0,
-        destination_wallet=b"\x01\x23\x45",
-        time=1_000,
-        nonce=None,
-        user_id=1,
-        signature_hex=DUMMY_SIG,
-        key_identifier=5,
-    )
-    with pytest.raises(AttributeError):
-        _ = msg.nonce
+    assert reconstructed.nonce == 5
 
 
 # ---------------------------------------------------------------------------
@@ -298,31 +216,15 @@ def test_pause_v2_round_trip() -> None:
         signature_type=SignatureType.SECP256K1,
         is_set=True,
         time=1_000,
-        nonce=None,
+        nonce=5,
         user_id=1,
         signature_hex=DUMMY_SIG,
-        key_identifier=5,
     )
     reconstructed = PauseWithdrawMessage.from_bytes(original.to_bytes())
 
     assert reconstructed.version == 2
     assert reconstructed.is_set is True
-    assert reconstructed.key_identifier == 5
-
-
-def test_pause_v2_nonce_raises() -> None:
-    msg = PauseWithdrawMessage(
-        version=2,
-        signature_type=SignatureType.SECP256K1,
-        is_set=False,
-        time=1_000,
-        nonce=None,
-        user_id=1,
-        signature_hex=DUMMY_SIG,
-        key_identifier=5,
-    )
-    with pytest.raises(AttributeError):
-        _ = msg.nonce
+    assert reconstructed.nonce == 5
 
 
 # ---------------------------------------------------------------------------
@@ -342,13 +244,11 @@ def test_add_public_key_v2_permanent_round_trip() -> None:
         time=1_000_000,
         user_id=42,
         signature_hex=DUMMY_SIG,
-        key_identifier=5,
     )
     reconstructed = AddPublicKeyMessage.from_bytes(original.to_bytes())
 
     assert reconstructed.version == 2
     assert reconstructed.managed_key_id == 10
-    assert reconstructed.key_identifier == 5
     assert reconstructed.key_mode == KeyMode.PERMANENT
     assert reconstructed.expiry is None
     assert reconstructed.public_key == SECP256K1_PUBKEY
@@ -366,7 +266,6 @@ def test_add_public_key_v2_temporary_round_trip() -> None:
         time=1_000_000,
         user_id=42,
         signature_hex=DUMMY_SIG,
-        key_identifier=5,
     )
     reconstructed = AddPublicKeyMessage.from_bytes(original.to_bytes())
 
@@ -374,7 +273,6 @@ def test_add_public_key_v2_temporary_round_trip() -> None:
     assert reconstructed.key_mode == KeyMode.TEMPORARY
     assert reconstructed.expiry == 2_000_000_000
     assert reconstructed.managed_key_id == 11
-    assert reconstructed.key_identifier == 5
 
 
 # ---------------------------------------------------------------------------
@@ -390,11 +288,9 @@ def test_remove_public_key_v2_round_trip() -> None:
         time=1_000_000,
         user_id=42,
         signature_hex=DUMMY_SIG,
-        key_identifier=5,
     )
     reconstructed = RemovePublicKeyMessage.from_bytes(original.to_bytes())
 
     assert reconstructed.version == 2
     assert reconstructed.managed_key_id == 10
-    assert reconstructed.key_identifier == 5
     assert reconstructed.user_id == 42

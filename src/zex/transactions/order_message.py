@@ -30,7 +30,6 @@ class OrderMessage(BaseMessage):
         nonce: int | None,
         user_id: int,
         signature_hex: str | None = None,
-        key_identifier: int | None = None,
     ) -> None:
         if version not in (1, 2):
             raise MessageValidationError("Unsupported version.")
@@ -48,13 +47,10 @@ class OrderMessage(BaseMessage):
         self.price_exponent = price_exponent
         self.time = time
         self._nonce = nonce
-        self._key_identifier = key_identifier
         self.user_id = user_id
 
-        if version == 1 and nonce is None:
-            raise MessageValidationError("nonce is required for v1 messages.")
-        if version == 2 and key_identifier is None:
-            raise MessageValidationError("key_identifier is required for v2 messages.")
+        if nonce is None:
+            raise MessageValidationError("nonce is required.")
 
         self._transaction_bytes: bytes | None = None
 
@@ -70,15 +66,8 @@ class OrderMessage(BaseMessage):
 
     @property
     def nonce(self) -> int:
-        if self._nonce is None:
-            raise AttributeError("nonce is not available in v2 messages; use time instead.")
+        assert self._nonce is not None
         return self._nonce
-
-    @property
-    def key_identifier(self) -> int:
-        if self._key_identifier is None:
-            raise AttributeError("key_identifier is not available in v1 messages.")
-        return self._key_identifier
 
     @property
     def amount(self) -> int:
@@ -103,7 +92,7 @@ class OrderMessage(BaseMessage):
     ) -> str:
         base = f">{base_token_length}s {quote_token_length}s Q b Q b"
         if version == 2:
-            return base + f" Q I Q {cls.SIGNATURE_LENGTH}s"
+            return base + f" Q Q Q {cls.SIGNATURE_LENGTH}s"
         return base + f" I Q Q {cls.SIGNATURE_LENGTH}s"
 
     @classmethod
@@ -170,7 +159,6 @@ class OrderMessage(BaseMessage):
                 ) = unpack(body_format, body_bytes)
             except struct_error as e:
                 raise MessageFormatError(f"Failed to unpack body: {e}") from e
-            key_identifier = None
         else:  # v2
             try:
                 (
@@ -181,13 +169,12 @@ class OrderMessage(BaseMessage):
                     price_mantissa,
                     price_exponent,
                     time,
-                    key_identifier,
+                    nonce,
                     user_id,
                     signature_bytes,
                 ) = unpack(body_format, body_bytes)
             except struct_error as e:
                 raise MessageFormatError(f"Failed to unpack body: {e}") from e
-            nonce = None
 
         try:
             sig_type = SignatureType.from_int(signature_type)
@@ -205,7 +192,6 @@ class OrderMessage(BaseMessage):
             price_exponent=price_exponent,
             time=time,
             nonce=nonce,
-            key_identifier=key_identifier,
             user_id=user_id,
             signature_hex=signature_bytes.hex(),
         )
@@ -215,11 +201,6 @@ class OrderMessage(BaseMessage):
     def __str__(self) -> str:
         amount = format_decimal(Decimal(self.amount_mantissa) * 10 ** Decimal(self.amount_exponent))
         price = format_decimal(Decimal(self.price_mantissa) * 10 ** Decimal(self.price_exponent))
-        nonce_or_key_identifier = (
-            f"nonce: {self._nonce}"
-            if self.version == 1
-            else f"key_identifier: {self._key_identifier}"
-        )
         return (
             f"v: {self.version}\n"
             f"name: {'buy' if self.TRANSACTION_TYPE == TransactionType.BUY else 'sell'}\n"
@@ -228,7 +209,7 @@ class OrderMessage(BaseMessage):
             f"amount: {amount}\n"
             f"price: {price}\n"
             f"t: {self.time}\n"
-            f"{nonce_or_key_identifier}\n"
+            f"nonce: {self._nonce}\n"
             f"user_id: {self.user_id}\n"
         )
 
@@ -278,7 +259,7 @@ class OrderMessage(BaseMessage):
                 self.price_mantissa,
                 self.price_exponent,
                 self.time,
-                self._key_identifier,
+                self._nonce,
                 self.user_id,
                 bytes.fromhex(self.signature_hex),
             )

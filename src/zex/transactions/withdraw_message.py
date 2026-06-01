@@ -38,7 +38,6 @@ class WithdrawMessage(BaseMessage):
         nonce: int | None,
         user_id: int,
         signature_hex: str | None = None,
-        key_identifier: int | None = None,
     ) -> None:
         if version not in (1, 2):
             raise MessageValidationError("Unsupported version.")
@@ -55,13 +54,10 @@ class WithdrawMessage(BaseMessage):
         self.token_name = token_name
         self.time = time
         self._nonce = nonce
-        self._key_identifier = key_identifier
         self.user_id = user_id
 
-        if version == 1 and nonce is None:
-            raise MessageValidationError("nonce is required for v1 messages.")
-        if version == 2 and key_identifier is None:
-            raise MessageValidationError("key_identifier is required for v2 messages.")
+        if nonce is None:
+            raise MessageValidationError("nonce is required.")
 
         self._transaction_bytes: bytes | None = None
 
@@ -73,15 +69,8 @@ class WithdrawMessage(BaseMessage):
 
     @property
     def nonce(self) -> int:
-        if self._nonce is None:
-            raise AttributeError("nonce is not available in v2 messages; use time instead.")
+        assert self._nonce is not None
         return self._nonce
-
-    @property
-    def key_identifier(self) -> int:
-        if self._key_identifier is None:
-            raise AttributeError("key_identifier is not available in v1 messages.")
-        return self._key_identifier
 
     @property
     def amount(self) -> int:
@@ -135,7 +124,6 @@ class WithdrawMessage(BaseMessage):
                 ) = unpack(body_format, body_bytes)
             except struct_error as e:
                 raise MessageFormatError(f"Failed to unpack body: {e}") from e
-            key_identifier = None
         else:  # v2
             try:
                 (
@@ -145,13 +133,12 @@ class WithdrawMessage(BaseMessage):
                     amount_exponent,
                     destination_wallet,
                     time,
-                    key_identifier,
+                    nonce,
                     user_id,
                     signature_bytes,
                 ) = unpack(body_format, body_bytes)
             except struct_error as e:
                 raise MessageFormatError(f"Failed to unpack body: {e}") from e
-            nonce = None
 
         chain_name = ChainName.from_string(token_chain_bytes.decode("ascii"))
         token_name = token_name_bytes.decode("ascii")
@@ -173,7 +160,6 @@ class WithdrawMessage(BaseMessage):
             nonce=nonce,
             user_id=user_id,
             signature_hex=signature_bytes.hex(),
-            key_identifier=key_identifier,
         )
         withdraw_message._transaction_bytes = transaction_bytes
         return withdraw_message
@@ -215,11 +201,8 @@ class WithdrawMessage(BaseMessage):
             f"amount: {amount}",
             f"to: {destination_str}",
             f"t: {self.time}",
+            f"nonce: {self._nonce}",
         ]
-        if self.version == 1:
-            parts.append(f"nonce: {self._nonce}")
-        else:
-            parts.append(f"key_identifier: {self._key_identifier}")
         parts.append(f"user_id: {self.user_id}")
         return "\n".join(parts) + "\n"
 
@@ -267,7 +250,7 @@ class WithdrawMessage(BaseMessage):
                 self.amount_exponent,
                 self.destination_wallet,
                 self.time,
-                self._key_identifier,
+                self._nonce,
                 self.user_id,
                 bytes.fromhex(self.signature_hex),
             )
