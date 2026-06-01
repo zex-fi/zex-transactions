@@ -49,8 +49,8 @@ class OrderMessage(BaseMessage):
         self._nonce = nonce
         self.user_id = user_id
 
-        if nonce is None:
-            raise MessageValidationError("nonce is required.")
+        if version == 1 and nonce is None:
+            raise MessageValidationError("nonce is required for v1 messages.")
 
         self._transaction_bytes: bytes | None = None
 
@@ -66,7 +66,8 @@ class OrderMessage(BaseMessage):
 
     @property
     def nonce(self) -> int:
-        assert self._nonce is not None
+        if self._nonce is None:
+            raise AttributeError("nonce is not available in v2 messages.")
         return self._nonce
 
     @property
@@ -92,7 +93,7 @@ class OrderMessage(BaseMessage):
     ) -> str:
         base = f">{base_token_length}s {quote_token_length}s Q b Q b"
         if version == 2:
-            return base + f" Q Q Q {cls.SIGNATURE_LENGTH}s"
+            return base + f" Q Q {cls.SIGNATURE_LENGTH}s"
         return base + f" I Q Q {cls.SIGNATURE_LENGTH}s"
 
     @classmethod
@@ -169,12 +170,12 @@ class OrderMessage(BaseMessage):
                     price_mantissa,
                     price_exponent,
                     time,
-                    nonce,
                     user_id,
                     signature_bytes,
                 ) = unpack(body_format, body_bytes)
             except struct_error as e:
                 raise MessageFormatError(f"Failed to unpack body: {e}") from e
+            nonce = None
 
         try:
             sig_type = SignatureType.from_int(signature_type)
@@ -259,7 +260,6 @@ class OrderMessage(BaseMessage):
                 self.price_mantissa,
                 self.price_exponent,
                 self.time,
-                self._nonce,
                 self.user_id,
                 bytes.fromhex(self.signature_hex),
             )

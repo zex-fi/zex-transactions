@@ -56,8 +56,8 @@ class WithdrawMessage(BaseMessage):
         self._nonce = nonce
         self.user_id = user_id
 
-        if nonce is None:
-            raise MessageValidationError("nonce is required.")
+        if version == 1 and nonce is None:
+            raise MessageValidationError("nonce is required for v1 messages.")
 
         self._transaction_bytes: bytes | None = None
 
@@ -69,7 +69,8 @@ class WithdrawMessage(BaseMessage):
 
     @property
     def nonce(self) -> int:
-        assert self._nonce is not None
+        if self._nonce is None:
+            raise AttributeError("nonce is not available in v2 messages.")
         return self._nonce
 
     @property
@@ -133,12 +134,12 @@ class WithdrawMessage(BaseMessage):
                     amount_exponent,
                     destination_wallet,
                     time,
-                    nonce,
                     user_id,
                     signature_bytes,
                 ) = unpack(body_format, body_bytes)
             except struct_error as e:
                 raise MessageFormatError(f"Failed to unpack body: {e}") from e
+            nonce = None
 
         chain_name = ChainName.from_string(token_chain_bytes.decode("ascii"))
         token_name = token_name_bytes.decode("ascii")
@@ -172,12 +173,16 @@ class WithdrawMessage(BaseMessage):
     def get_body_format(
         cls, token_length: int, destination_wallet_length: int, version: int = 1
     ) -> str:
-        # v1: time(I) | nonce | user_id | sig
-        # v2: time(Q) | key_identifier | user_id | sig
-        time_fmt = "Q" if version == 2 else "I"
+        # v1: time(I) | nonce(I) | user_id | sig
+        # v2: time(Q) | user_id | sig
+        if version == 2:
+            return (
+                f">3s {token_length}s Q b {destination_wallet_length}s"
+                f" Q Q {cls.SIGNATURE_LENGTH}s"
+            )
         return (
             f">3s {token_length}s Q b {destination_wallet_length}s"
-            f" {time_fmt} I Q {cls.SIGNATURE_LENGTH}s"
+            f" I I Q {cls.SIGNATURE_LENGTH}s"
         )
 
     @classmethod
@@ -201,8 +206,9 @@ class WithdrawMessage(BaseMessage):
             f"amount: {amount}",
             f"to: {destination_str}",
             f"t: {self.time}",
-            f"nonce: {self._nonce}",
         ]
+        if self.version == 1:
+            parts.append(f"nonce: {self._nonce}")
         parts.append(f"user_id: {self.user_id}")
         return "\n".join(parts) + "\n"
 
@@ -250,7 +256,6 @@ class WithdrawMessage(BaseMessage):
                 self.amount_exponent,
                 self.destination_wallet,
                 self.time,
-                self._nonce,
                 self.user_id,
                 bytes.fromhex(self.signature_hex),
             )

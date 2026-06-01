@@ -39,14 +39,15 @@ class PauseWithdrawMessage(BaseMessage):
         self._nonce = nonce
         self.user_id = user_id
 
-        if nonce is None:
-            raise MessageValidationError("nonce is required.")
+        if version == 1 and nonce is None:
+            raise MessageValidationError("nonce is required for v1 messages.")
 
         self._transaction_bytes: bytes | None = None
 
     @property
     def nonce(self) -> int:
-        assert self._nonce is not None
+        if self._nonce is None:
+            raise AttributeError("nonce is not available in v2 messages.")
         return self._nonce
 
     @classmethod
@@ -55,10 +56,10 @@ class PauseWithdrawMessage(BaseMessage):
 
     @classmethod
     def get_body_format(cls, version: int = 1) -> str:
-        # v1: is_set | time(I) | nonce | user_id | sig
-        # v2: is_set | time(Q) | key_identifier | user_id | sig
+        # v1: is_set | time(I) | nonce(I) | user_id | sig
+        # v2: is_set | time(Q) | user_id | sig
         if version == 2:
-            return f">BQIQ {cls.SIGNATURE_LENGTH}s"
+            return f">BQQ {cls.SIGNATURE_LENGTH}s"
         return f">BIIQ {cls.SIGNATURE_LENGTH}s"
 
     @classmethod
@@ -93,9 +94,10 @@ class PauseWithdrawMessage(BaseMessage):
                 raise MessageFormatError(f"Failed to unpack body: {e}") from e
         else:  # v2
             try:
-                is_set, time, nonce, user_id, signature_bytes = unpack(body_format, body_bytes)
+                is_set, time, user_id, signature_bytes = unpack(body_format, body_bytes)
             except struct_error as e:
                 raise MessageFormatError(f"Failed to unpack body: {e}") from e
+            nonce = None
 
         if is_set not in (0, 1):
             raise MessageFormatError("Incorrect value for is_set argument.")
@@ -153,7 +155,6 @@ class PauseWithdrawMessage(BaseMessage):
                 self.signature_type.value,
                 self.is_set,
                 self.time,
-                self._nonce,
                 self.user_id,
                 bytes.fromhex(self.signature_hex),
             )

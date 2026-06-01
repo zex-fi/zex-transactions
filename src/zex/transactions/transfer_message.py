@@ -80,8 +80,8 @@ class TransferMessage(BaseMessage):
         self._nonce = nonce
         self.user_id = user_id
 
-        if nonce is None:
-            raise MessageValidationError("nonce is required.")
+        if version == 1 and nonce is None:
+            raise MessageValidationError("nonce is required for v1 messages.")
 
         self.chain = ChainName.Internal
         self._transaction_bytes: bytes | None = None
@@ -95,7 +95,8 @@ class TransferMessage(BaseMessage):
 
     @property
     def nonce(self) -> int:
-        assert self._nonce is not None
+        if self._nonce is None:
+            raise AttributeError("nonce is not available in v2 messages.")
         return self._nonce
 
     @property
@@ -149,12 +150,12 @@ class TransferMessage(BaseMessage):
                     amount_exponent,
                     recipient_id,
                     time,
-                    nonce,
                     user_id,
                     signature_bytes,
                 ) = unpack(body_format, body_bytes)
             except struct_error as e:
                 raise MessageFormatError(f"Failed to unpack body: {e}") from e
+            nonce = None
 
         try:
             sig_type = SignatureType.from_int(signature_type)
@@ -182,10 +183,10 @@ class TransferMessage(BaseMessage):
 
     @classmethod
     def get_body_format(cls, token_length: int, version: int = 1) -> str:
-        # v1: token | amt_m | amt_e | recipient_id | time(I) | nonce | user_id | sig
-        # v2: token | amt_m | amt_e | recipient_id | time(Q) | key_identifier | user_id | sig
+        # v1: token | amt_m | amt_e | recipient_id | time(I) | nonce(I) | user_id | sig
+        # v2: token | amt_m | amt_e | recipient_id | time(Q) | user_id | sig
         if version == 2:
-            return f">{token_length}s Q b Q Q I Q {cls.SIGNATURE_LENGTH}s"
+            return f">{token_length}s Q b Q Q Q {cls.SIGNATURE_LENGTH}s"
         return f">{token_length}s Q b Q I I Q {cls.SIGNATURE_LENGTH}s"
 
     @classmethod
@@ -238,7 +239,6 @@ class TransferMessage(BaseMessage):
                 self.amount_exponent,
                 self.recipient_id,
                 self.time,
-                self._nonce,
                 self.user_id,
                 bytes.fromhex(self.signature_hex),
             )

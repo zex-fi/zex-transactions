@@ -37,7 +37,7 @@ def _make_buy_v2(sig: str | None = DUMMY_SIG) -> BuyMessage:
         price_mantissa=5,
         price_exponent=4,
         time=10_000,
-        nonce=7,
+        nonce=None,
         user_id=1,
         signature_hex=sig,
     )
@@ -63,7 +63,6 @@ def test_buy_v2_round_trip() -> None:
     reconstructed = BuyMessage.from_bytes(original.to_bytes())
 
     assert reconstructed.version == 2
-    assert reconstructed.nonce == 7
     assert reconstructed.base_token == "BTC"
     assert reconstructed.quote_token == "USDT"
     assert reconstructed.time == 10_000
@@ -71,10 +70,16 @@ def test_buy_v2_round_trip() -> None:
     assert reconstructed.signature_hex == DUMMY_SIG
 
 
-def test_buy_v2_requires_nonce() -> None:
+def test_buy_v2_nonce_raises() -> None:
+    msg = _make_buy_v2()
+    with pytest.raises(AttributeError):
+        _ = msg.nonce
+
+
+def test_buy_v1_requires_nonce() -> None:
     with pytest.raises(MessageValidationError):
         BuyMessage(
-            version=2,
+            version=1,
             signature_type=SignatureType.SECP256K1,
             base_token="BTC",
             quote_token="USDT",
@@ -116,14 +121,13 @@ def test_sell_v2_round_trip() -> None:
         price_mantissa=3,
         price_exponent=3,
         time=20_000,
-        nonce=9,
+        nonce=None,
         user_id=5,
         signature_hex=DUMMY_SIG,
     )
     reconstructed = SellMessage.from_bytes(original.to_bytes())
 
     assert reconstructed.version == 2
-    assert reconstructed.nonce == 9
     assert reconstructed.user_id == 5
 
 
@@ -167,7 +171,7 @@ def test_transfer_v2_round_trip() -> None:
         amount_exponent=0,
         recipient_id=99,
         time=1_000,
-        nonce=5,
+        nonce=None,
         user_id=1,
         signature_hex=DUMMY_SIG,
     )
@@ -176,7 +180,23 @@ def test_transfer_v2_round_trip() -> None:
     assert reconstructed.version == 2
     assert reconstructed.user_id == 1
     assert reconstructed.recipient_id == 99
-    assert reconstructed.nonce == 5
+
+
+def test_transfer_v2_nonce_raises() -> None:
+    msg = TransferMessage(
+        version=2,
+        signature_type=SignatureType.SECP256K1,
+        token_name="BTC",
+        amount_mantissa=1,
+        amount_exponent=0,
+        recipient_id=99,
+        time=1_000,
+        nonce=None,
+        user_id=1,
+        signature_hex=DUMMY_SIG,
+    )
+    with pytest.raises(AttributeError):
+        _ = msg.nonce
 
 
 # ---------------------------------------------------------------------------
@@ -194,7 +214,7 @@ def test_withdraw_v2_round_trip() -> None:
         amount_exponent=0,
         destination_wallet=b"\x01\x23\x45",
         time=1_000,
-        nonce=5,
+        nonce=None,
         user_id=1,
         signature_hex=DUMMY_SIG,
     )
@@ -202,7 +222,24 @@ def test_withdraw_v2_round_trip() -> None:
 
     assert reconstructed.version == 2
     assert reconstructed.destination_wallet == b"\x01\x23\x45"
-    assert reconstructed.nonce == 5
+
+
+def test_withdraw_v2_nonce_raises() -> None:
+    msg = WithdrawMessage(
+        version=2,
+        signature_type=SignatureType.SECP256K1,
+        token_name="BTC",
+        chain_name=ChainName.Bitcoin,
+        amount_mantissa=1,
+        amount_exponent=0,
+        destination_wallet=b"\x01\x23\x45",
+        time=1_000,
+        nonce=None,
+        user_id=1,
+        signature_hex=DUMMY_SIG,
+    )
+    with pytest.raises(AttributeError):
+        _ = msg.nonce
 
 
 # ---------------------------------------------------------------------------
@@ -216,7 +253,7 @@ def test_pause_v2_round_trip() -> None:
         signature_type=SignatureType.SECP256K1,
         is_set=True,
         time=1_000,
-        nonce=5,
+        nonce=None,
         user_id=1,
         signature_hex=DUMMY_SIG,
     )
@@ -224,7 +261,20 @@ def test_pause_v2_round_trip() -> None:
 
     assert reconstructed.version == 2
     assert reconstructed.is_set is True
-    assert reconstructed.nonce == 5
+
+
+def test_pause_v2_nonce_raises() -> None:
+    msg = PauseWithdrawMessage(
+        version=2,
+        signature_type=SignatureType.SECP256K1,
+        is_set=False,
+        time=1_000,
+        nonce=None,
+        user_id=1,
+        signature_hex=DUMMY_SIG,
+    )
+    with pytest.raises(AttributeError):
+        _ = msg.nonce
 
 
 # ---------------------------------------------------------------------------
