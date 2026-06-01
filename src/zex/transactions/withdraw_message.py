@@ -186,9 +186,13 @@ class WithdrawMessage(BaseMessage):
     def get_body_format(
         cls, token_length: int, destination_wallet_length: int, version: int = 1
     ) -> str:
-        # v1: time | nonce | user_id | sig
-        # v2: time | key_identifier | user_id | sig  (same byte layout, different semantics)
-        return f">3s {token_length}s Q b {destination_wallet_length}s I I Q {cls.SIGNATURE_LENGTH}s"
+        # v1: time(I) | nonce | user_id | sig
+        # v2: time(Q) | key_identifier | user_id | sig
+        time_fmt = "Q" if version == 2 else "I"
+        return (
+            f">3s {token_length}s Q b {destination_wallet_length}s"
+            f" {time_fmt} I Q {cls.SIGNATURE_LENGTH}s"
+        )
 
     @classmethod
     def get_format(cls, token_length: int, destination_wallet_length: int, version: int = 1) -> str:

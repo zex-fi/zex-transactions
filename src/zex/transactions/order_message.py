@@ -101,10 +101,10 @@ class OrderMessage(BaseMessage):
         quote_token_length: int,
         version: int = 1,
     ) -> str:
-        base = f">{base_token_length}s {quote_token_length}s Q b Q b I"
+        base = f">{base_token_length}s {quote_token_length}s Q b Q b"
         if version == 2:
-            return base + f" I Q {cls.SIGNATURE_LENGTH}s"
-        return base + f" Q Q {cls.SIGNATURE_LENGTH}s"
+            return base + f" Q I Q {cls.SIGNATURE_LENGTH}s"
+        return base + f" I Q Q {cls.SIGNATURE_LENGTH}s"
 
     @classmethod
     def get_format(

@@ -196,8 +196,10 @@ class TransferMessage(BaseMessage):
 
     @classmethod
     def get_body_format(cls, token_length: int, version: int = 1) -> str:
-        # v1: token | amt_m | amt_e | recipient_id | time | nonce | user_id | sig
-        # v2: token | amt_m | amt_e | recipient_id | time | key_identifier | user_id | sig
+        # v1: token | amt_m | amt_e | recipient_id | time(I) | nonce | user_id | sig
+        # v2: token | amt_m | amt_e | recipient_id | time(Q) | key_identifier | user_id | sig
+        if version == 2:
+            return f">{token_length}s Q b Q Q I Q {cls.SIGNATURE_LENGTH}s"
         return f">{token_length}s Q b Q I I Q {cls.SIGNATURE_LENGTH}s"
 
     @classmethod

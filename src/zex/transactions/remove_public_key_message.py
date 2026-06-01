@@ -78,8 +78,8 @@ class RemovePublicKeyMessage(BaseMessage):
 
     @classmethod
     def get_body_format(cls) -> str:
-        # managed_key_id | time | key_identifier | user_id | sig
-        return f">I I I Q {cls.SIGNATURE_LENGTH}s"
+        # managed_key_id | time(Q) | key_identifier | user_id | sig
+        return f">I Q I Q {cls.SIGNATURE_LENGTH}s"
 
     @classmethod
     def get_format(cls) -> str:

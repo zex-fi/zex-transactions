@@ -66,8 +66,10 @@ class PauseWithdrawMessage(BaseMessage):
 
     @classmethod
     def get_body_format(cls, version: int = 1) -> str:
-        # v1: is_set | time | nonce | user_id | sig
-        # v2: is_set | time | key_identifier | user_id | sig
+        # v1: is_set | time(I) | nonce | user_id | sig
+        # v2: is_set | time(Q) | key_identifier | user_id | sig
+        if version == 2:
+            return f">BQIQ {cls.SIGNATURE_LENGTH}s"
         return f">BIIQ {cls.SIGNATURE_LENGTH}s"
 
     @classmethod

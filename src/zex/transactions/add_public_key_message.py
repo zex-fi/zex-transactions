@@ -116,11 +116,11 @@ class AddPublicKeyMessage(BaseMessage):
         """
         prefix = f">I {public_key_length}s B"
         if key_mode == KeyMode.TEMPORARY:
-            # expiry, time, key_identifier, user_id, sig
-            suffix = f"I I I Q {cls.SIGNATURE_LENGTH}s"
+            # expiry(I), time(Q), key_identifier, user_id, sig
+            suffix = f"I Q I Q {cls.SIGNATURE_LENGTH}s"
         else:
-            # time, key_identifier, user_id, sig
-            suffix = f"I I Q {cls.SIGNATURE_LENGTH}s"
+            # time(Q), key_identifier, user_id, sig
+            suffix = f"Q I Q {cls.SIGNATURE_LENGTH}s"
         return f"{prefix} {suffix}"
 
     @classmethod
