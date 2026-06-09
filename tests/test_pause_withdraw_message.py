@@ -1,4 +1,7 @@
+import pytest
+
 from zex.transactions import PauseWithdrawMessage
+from zex.transactions.exceptions import MessageValidationError
 from zex.utils.zex_types import SignatureType
 
 
@@ -28,3 +31,33 @@ def test_given_output_of_to_bytes_when_calling_from_bytes_then_construct_the_sam
     assert new_pause_withdraw_message.nonce == original_pause_withdraw_message.nonce
     assert new_pause_withdraw_message.user_id == original_pause_withdraw_message.user_id
     assert new_pause_withdraw_message.is_set == original_pause_withdraw_message.is_set
+
+
+def test_given_v2_and_nonce_when_creating_message_then_raises_validation_error(
+    dummy_signature_hex: str,
+) -> None:
+    with pytest.raises(MessageValidationError):
+        PauseWithdrawMessage(
+            version=2,
+            signature_type=SignatureType.SECP256K1,
+            is_set=True,
+            time=1000,
+            nonce=5,
+            user_id=1,
+            signature_hex=dummy_signature_hex,
+        )
+
+
+def test_given_v1_and_no_nonce_when_creating_message_then_raises_validation_error(
+    dummy_signature_hex: str,
+) -> None:
+    with pytest.raises(MessageValidationError):
+        PauseWithdrawMessage(
+            version=1,
+            signature_type=SignatureType.SECP256K1,
+            is_set=True,
+            time=1000,
+            nonce=None,
+            user_id=1,
+            signature_hex=dummy_signature_hex,
+        )

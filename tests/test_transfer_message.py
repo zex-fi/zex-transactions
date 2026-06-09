@@ -1,4 +1,7 @@
+import pytest
+
 from zex.transactions import TransferMessage
+from zex.transactions.exceptions import MessageValidationError
 from zex.utils.zex_types import SignatureType
 
 
@@ -32,3 +35,39 @@ def test_given_output_of_to_bytes_when_calling_from_bytes_then_construct_the_sam
     assert new_transfer_message.nonce == original_transfer_message.nonce
     assert new_transfer_message.amount == original_transfer_message.amount
     assert new_transfer_message.recipient_id == original_transfer_message.recipient_id
+
+
+def test_given_v2_and_nonce_when_creating_message_then_raises_validation_error(
+    dummy_signature_hex: str,
+) -> None:
+    with pytest.raises(MessageValidationError):
+        TransferMessage(
+            version=2,
+            signature_type=SignatureType.SECP256K1,
+            token_name="BTC",
+            amount_mantissa=1,
+            amount_exponent=1,
+            recipient_id=2,
+            time=1000,
+            nonce=5,
+            user_id=1,
+            signature_hex=dummy_signature_hex,
+        )
+
+
+def test_given_v1_and_no_nonce_when_creating_message_then_raises_validation_error(
+    dummy_signature_hex: str,
+) -> None:
+    with pytest.raises(MessageValidationError):
+        TransferMessage(
+            version=1,
+            signature_type=SignatureType.SECP256K1,
+            token_name="BTC",
+            amount_mantissa=1,
+            amount_exponent=1,
+            recipient_id=2,
+            time=1000,
+            nonce=None,
+            user_id=1,
+            signature_hex=dummy_signature_hex,
+        )

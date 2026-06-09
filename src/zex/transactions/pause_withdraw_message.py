@@ -41,6 +41,8 @@ class PauseWithdrawMessage(BaseMessage):
 
         if version == 1 and nonce is None:
             raise MessageValidationError("nonce is required for v1 messages.")
+        if version == 2 and nonce is not None:
+            raise MessageValidationError("nonce must be None for v2 messages.")
 
         self._transaction_bytes: bytes | None = None
 
@@ -98,6 +100,11 @@ class PauseWithdrawMessage(BaseMessage):
             except struct_error as e:
                 raise MessageFormatError(f"Failed to unpack body: {e}") from e
             nonce = None
+
+        if version == 2 and nonce is not None:
+            raise MessageValidationError("nonce must be None for v2 messages.")
+        if version == 1 and nonce is None:
+            raise MessageValidationError("nonce is required for v1 messages.")
 
         if is_set not in (0, 1):
             raise MessageFormatError("Incorrect value for is_set argument.")

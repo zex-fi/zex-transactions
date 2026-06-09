@@ -1,6 +1,8 @@
+import pytest
 from solders.keypair import Keypair
 
 from zex.transactions import BuyMessage
+from zex.transactions.exceptions import MessageValidationError
 from zex.utils.zex_types import SignatureType
 
 

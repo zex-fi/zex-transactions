@@ -51,6 +51,8 @@ class OrderMessage(BaseMessage):
 
         if version == 1 and nonce is None:
             raise MessageValidationError("nonce is required for v1 messages.")
+        if version == 2 and nonce is not None:
+            raise MessageValidationError("nonce must be None for v2 messages.")
 
         self._transaction_bytes: bytes | None = None
 
@@ -176,6 +178,11 @@ class OrderMessage(BaseMessage):
             except struct_error as e:
                 raise MessageFormatError(f"Failed to unpack body: {e}") from e
             nonce = None
+
+        if version == 2 and nonce is not None:
+            raise MessageValidationError("nonce must be None for v2 messages.")
+        if version == 1 and nonce is None:
+            raise MessageValidationError("nonce is required for v1 messages.")
 
         try:
             sig_type = SignatureType.from_int(signature_type)
