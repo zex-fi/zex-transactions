@@ -282,9 +282,9 @@ def test_pause_v2_nonce_raises() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_add_public_key_v2_permanent_round_trip() -> None:
+def test_add_public_key_v3_permanent_round_trip() -> None:
     original = AddPublicKeyMessage(
-        version=2,
+        version=3,
         signature_type=SignatureType.SECP256K1,
         key_signature_type=SignatureType.SECP256K1,
         managed_key_id=10,
@@ -293,20 +293,22 @@ def test_add_public_key_v2_permanent_round_trip() -> None:
         public_key=SECP256K1_PUBKEY,
         time=1_000_000,
         user_id=42,
+        key_identifier=7,
         signature_hex=DUMMY_SIG,
     )
     reconstructed = AddPublicKeyMessage.from_bytes(original.to_bytes())
 
-    assert reconstructed.version == 2
+    assert reconstructed.version == 3
     assert reconstructed.managed_key_id == 10
     assert reconstructed.key_mode == KeyMode.PERMANENT
     assert reconstructed.expiry is None
     assert reconstructed.public_key == SECP256K1_PUBKEY
+    assert reconstructed.key_identifier == 7
 
 
-def test_add_public_key_v2_temporary_round_trip() -> None:
+def test_add_public_key_v3_temporary_round_trip() -> None:
     original = AddPublicKeyMessage(
-        version=2,
+        version=3,
         signature_type=SignatureType.SECP256K1,
         key_signature_type=SignatureType.SECP256K1,
         managed_key_id=11,
@@ -315,32 +317,36 @@ def test_add_public_key_v2_temporary_round_trip() -> None:
         public_key=SECP256K1_PUBKEY,
         time=1_000_000,
         user_id=42,
+        key_identifier=3,
         signature_hex=DUMMY_SIG,
     )
     reconstructed = AddPublicKeyMessage.from_bytes(original.to_bytes())
 
-    assert reconstructed.version == 2
+    assert reconstructed.version == 3
     assert reconstructed.key_mode == KeyMode.TEMPORARY
     assert reconstructed.expiry == 2_000_000_000
     assert reconstructed.managed_key_id == 11
+    assert reconstructed.key_identifier == 3
 
 
 # ---------------------------------------------------------------------------
-# RemovePublicKeyMessage v2
+# RemovePublicKeyMessage v3
 # ---------------------------------------------------------------------------
 
 
-def test_remove_public_key_v2_round_trip() -> None:
+def test_remove_public_key_v3_round_trip() -> None:
     original = RemovePublicKeyMessage(
-        version=2,
+        version=3,
         signature_type=SignatureType.SECP256K1,
         managed_key_id=10,
         time=1_000_000,
         user_id=42,
+        key_identifier=5,
         signature_hex=DUMMY_SIG,
     )
     reconstructed = RemovePublicKeyMessage.from_bytes(original.to_bytes())
 
-    assert reconstructed.version == 2
+    assert reconstructed.version == 3
     assert reconstructed.managed_key_id == 10
     assert reconstructed.user_id == 42
+    assert reconstructed.key_identifier == 5

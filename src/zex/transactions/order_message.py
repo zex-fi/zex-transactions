@@ -29,9 +29,10 @@ class OrderMessage(BaseMessage):
         time: int,
         nonce: int | None,
         user_id: int,
+        key_identifier: int | None = None,
         signature_hex: str | None = None,
     ) -> None:
-        if version not in (1, 2):
+        if version not in (1, 2, 3):
             raise MessageValidationError("Unsupported version.")
 
         self.version = version
@@ -47,10 +48,13 @@ class OrderMessage(BaseMessage):
         self.price_exponent = price_exponent
         self.time = time
         self._nonce = nonce
+        self._key_identifier = key_identifier
         self.user_id = user_id
 
         if version == 1 and nonce is None:
             raise MessageValidationError("nonce is required for v1 messages.")
+        if version == 3 and key_identifier is None:
+            raise MessageValidationError("key_identifier is required for v3 messages.")
 
         self._transaction_bytes: bytes | None = None
 
@@ -69,6 +73,12 @@ class OrderMessage(BaseMessage):
         if self._nonce is None:
             raise AttributeError("nonce is not available in v2 messages.")
         return self._nonce
+
+    @property
+    def key_identifier(self) -> int:
+        if self._key_identifier is None:
+            raise AttributeError("key_identifier is not available in v1/v2 messages.")
+        return self._key_identifier
 
     @property
     def amount(self) -> int:
@@ -92,8 +102,13 @@ class OrderMessage(BaseMessage):
         version: int = 1,
     ) -> str:
         base = f">{base_token_length}s {quote_token_length}s Q b Q b"
+        # v1: time(I) | nonce(Q) | user_id(Q) | sig
+        # v2: time(Q) | user_id(Q) | sig
+        # v3: time(Q) | key_identifier(Q) | user_id(Q) | sig
         if version == 2:
             return base + f" Q Q {cls.SIGNATURE_LENGTH}s"
+        if version == 3:
+            return base + f" Q Q Q {cls.SIGNATURE_LENGTH}s"
         return base + f" I Q Q {cls.SIGNATURE_LENGTH}s"
 
     @classmethod
@@ -128,7 +143,7 @@ class OrderMessage(BaseMessage):
         except struct_error as e:
             raise HeaderFormatError(f"Failed to unpack header: {e}") from e
 
-        if msg_version not in (1, 2):
+        if msg_version not in (1, 2, 3):
             raise MessageFormatError("Unsupported version.")
 
         if command != cls.TRANSACTION_TYPE.value:
@@ -160,7 +175,8 @@ class OrderMessage(BaseMessage):
                 ) = unpack(body_format, body_bytes)
             except struct_error as e:
                 raise MessageFormatError(f"Failed to unpack body: {e}") from e
-        else:  # v2
+            key_identifier = None
+        elif msg_version == 2:
             try:
                 (
                     base_token_bytes,
@@ -170,6 +186,24 @@ class OrderMessage(BaseMessage):
                     price_mantissa,
                     price_exponent,
                     time,
+                    user_id,
+                    signature_bytes,
+                ) = unpack(body_format, body_bytes)
+            except struct_error as e:
+                raise MessageFormatError(f"Failed to unpack body: {e}") from e
+            nonce = None
+            key_identifier = None
+        else:  # v3
+            try:
+                (
+                    base_token_bytes,
+                    quote_token_bytes,
+                    amount_mantissa,
+                    amount_exponent,
+                    price_mantissa,
+                    price_exponent,
+                    time,
+                    key_identifier,
                     user_id,
                     signature_bytes,
                 ) = unpack(body_format, body_bytes)
@@ -194,6 +228,7 @@ class OrderMessage(BaseMessage):
             time=time,
             nonce=nonce,
             user_id=user_id,
+            key_identifier=key_identifier,
             signature_hex=signature_bytes.hex(),
         )
         order_message._transaction_bytes = transaction_bytes
@@ -202,28 +237,22 @@ class OrderMessage(BaseMessage):
     def __str__(self) -> str:
         amount = format_decimal(Decimal(self.amount_mantissa) * 10 ** Decimal(self.amount_exponent))
         price = format_decimal(Decimal(self.price_mantissa) * 10 ** Decimal(self.price_exponent))
+        name = "buy" if self.TRANSACTION_TYPE == TransactionType.BUY else "sell"
+        parts = [
+            f"v: {self.version}",
+            f"name: {name}",
+            f"base token: {self.base_token}",
+            f"quote token: {self.quote_token}",
+            f"amount: {amount}",
+            f"price: {price}",
+            f"t: {self.time}",
+        ]
         if self.version == 1:
-            return (
-                f"v: {self.version}\n"
-                f"name: {'buy' if self.TRANSACTION_TYPE == TransactionType.BUY else 'sell'}\n"
-                f"base token: {self.base_token}\n"
-                f"quote token: {self.quote_token}\n"
-                f"amount: {amount}\n"
-                f"price: {price}\n"
-                f"t: {self.time}\n"
-                f"nonce: {self._nonce}\n"
-                f"user_id: {self.user_id}\n"
-            )
-        return (
-            f"v: {self.version}\n"
-            f"name: {'buy' if self.TRANSACTION_TYPE == TransactionType.BUY else 'sell'}\n"
-            f"base token: {self.base_token}\n"
-            f"quote token: {self.quote_token}\n"
-            f"amount: {amount}\n"
-            f"price: {price}\n"
-            f"t: {self.time}\n"
-            f"user_id: {self.user_id}\n"
-        )
+            parts.append(f"nonce: {self._nonce}")
+        if self.version == 3:
+            parts.append(f"key_identifier: {self._key_identifier}")
+        parts.append(f"user_id: {self.user_id}")
+        return "\n".join(parts) + "\n"
 
     def to_bytes(self) -> bytes:
         if self._transaction_bytes is not None:
@@ -252,7 +281,7 @@ class OrderMessage(BaseMessage):
                 self.user_id,
                 bytes.fromhex(self.signature_hex),
             )
-        else:  # version == 2
+        elif self.version == 2:
             transaction_bytes = pack(
                 OrderMessage.get_format(
                     base_token_length=len(self.base_token),
@@ -271,6 +300,29 @@ class OrderMessage(BaseMessage):
                 self.price_mantissa,
                 self.price_exponent,
                 self.time,
+                self.user_id,
+                bytes.fromhex(self.signature_hex),
+            )
+        else:  # version == 3
+            transaction_bytes = pack(
+                OrderMessage.get_format(
+                    base_token_length=len(self.base_token),
+                    quote_token_length=len(self.quote_token),
+                    version=3,
+                ),
+                self.version,
+                self.TRANSACTION_TYPE.value,
+                self.signature_type.value,
+                len(self.base_token),
+                len(self.quote_token),
+                self.base_token.encode("ascii"),
+                self.quote_token.encode("ascii"),
+                self.amount_mantissa,
+                self.amount_exponent,
+                self.price_mantissa,
+                self.price_exponent,
+                self.time,
+                self._key_identifier,
                 self.user_id,
                 bytes.fromhex(self.signature_hex),
             )

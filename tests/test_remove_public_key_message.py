@@ -9,11 +9,12 @@ from zex.utils.zex_types import SignatureType
 
 def _make_msg(dummy_signature_hex: str) -> RemovePublicKeyMessage:
     return RemovePublicKeyMessage(
-        version=2,
+        version=3,
         signature_type=SignatureType.SECP256K1,
         managed_key_id=1,
         time=1_000_000,
         user_id=42,
+        key_identifier=99,
         signature_hex=dummy_signature_hex,
     )
 
@@ -28,6 +29,7 @@ def test_round_trip(dummy_signature_hex: str) -> None:
     assert reconstructed.managed_key_id == original.managed_key_id
     assert reconstructed.time == original.time
     assert reconstructed.user_id == original.user_id
+    assert reconstructed.key_identifier == original.key_identifier
     assert reconstructed.signature_hex == original.signature_hex
 
 
@@ -40,11 +42,12 @@ def test_base_message_dispatch(dummy_signature_hex: str) -> None:
 
 def test_secp256k1_sign_and_verify(private_key: PrivateKey) -> None:
     msg = RemovePublicKeyMessage(
-        version=2,
+        version=3,
         signature_type=SignatureType.SECP256K1,
         managed_key_id=1,
         time=1_000_000,
         user_id=1,
+        key_identifier=0,
         signature_hex=None,
     )
 
@@ -55,11 +58,12 @@ def test_secp256k1_sign_and_verify(private_key: PrivateKey) -> None:
 
 def test_ed25519_sign_and_verify(ed25519_keypair: Keypair) -> None:
     msg = RemovePublicKeyMessage(
-        version=2,
+        version=3,
         signature_type=SignatureType.ED25519,
         managed_key_id=2,
         time=1_000_000,
         user_id=5,
+        key_identifier=0,
         signature_hex=None,
     )
 
@@ -81,4 +85,5 @@ def test_v1_raises() -> None:
             managed_key_id=1,
             time=1,
             user_id=1,
+            key_identifier=0,
         )

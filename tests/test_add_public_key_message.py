@@ -12,7 +12,7 @@ def _make_permanent(
     dummy_public_key_secp256k1: bytes,
 ) -> AddPublicKeyMessage:
     return AddPublicKeyMessage(
-        version=2,
+        version=3,
         signature_type=SignatureType.SECP256K1,
         key_signature_type=SignatureType.SECP256K1,
         managed_key_id=1,
@@ -21,6 +21,7 @@ def _make_permanent(
         public_key=dummy_public_key_secp256k1,
         time=1_000_000,
         user_id=42,
+        key_identifier=99,
         signature_hex=dummy_signature_hex,
     )
 
@@ -41,6 +42,7 @@ def test_permanent_key_round_trip(
     assert reconstructed.public_key == original.public_key
     assert reconstructed.time == original.time
     assert reconstructed.user_id == original.user_id
+    assert reconstructed.key_identifier == original.key_identifier
     assert reconstructed.signature_hex == original.signature_hex
 
 
@@ -48,7 +50,7 @@ def test_temporary_key_round_trip(
     dummy_signature_hex: str, dummy_public_key_secp256k1: bytes
 ) -> None:
     original = AddPublicKeyMessage(
-        version=2,
+        version=3,
         signature_type=SignatureType.SECP256K1,
         key_signature_type=SignatureType.SECP256K1,
         managed_key_id=99,
@@ -57,6 +59,7 @@ def test_temporary_key_round_trip(
         public_key=dummy_public_key_secp256k1,
         time=1_700_000_000,
         user_id=7,
+        key_identifier=5,
         signature_hex=dummy_signature_hex,
     )
 
@@ -66,6 +69,7 @@ def test_temporary_key_round_trip(
     assert reconstructed.expiry == 1_800_000_000
     assert reconstructed.managed_key_id == 99
     assert reconstructed.user_id == 7
+    assert reconstructed.key_identifier == 5
 
 
 def test_ed25519_secondary_key_round_trip(
@@ -73,7 +77,7 @@ def test_ed25519_secondary_key_round_trip(
 ) -> None:
     ed25519_pubkey = bytes(Keypair().pubkey())
     original = AddPublicKeyMessage(
-        version=2,
+        version=3,
         signature_type=SignatureType.SECP256K1,
         key_signature_type=SignatureType.ED25519,
         managed_key_id=5,
@@ -82,6 +86,7 @@ def test_ed25519_secondary_key_round_trip(
         public_key=ed25519_pubkey,
         time=2_000_000,
         user_id=100,
+        key_identifier=1,
         signature_hex=dummy_signature_hex,
     )
 
@@ -105,7 +110,7 @@ def test_secp256k1_sign_and_verify(
     private_key: PrivateKey, dummy_public_key_secp256k1: bytes
 ) -> None:
     msg = AddPublicKeyMessage(
-        version=2,
+        version=3,
         signature_type=SignatureType.SECP256K1,
         key_signature_type=SignatureType.SECP256K1,
         managed_key_id=1,
@@ -114,6 +119,7 @@ def test_secp256k1_sign_and_verify(
         public_key=dummy_public_key_secp256k1,
         time=1_000_000,
         user_id=1,
+        key_identifier=0,
         signature_hex=None,
     )
 
@@ -125,7 +131,7 @@ def test_secp256k1_sign_and_verify(
 def test_ed25519_sign_and_verify(ed25519_keypair: Keypair) -> None:
     ed25519_pubkey = bytes(ed25519_keypair.pubkey())
     msg = AddPublicKeyMessage(
-        version=2,
+        version=3,
         signature_type=SignatureType.ED25519,
         key_signature_type=SignatureType.ED25519,
         managed_key_id=2,
@@ -134,6 +140,7 @@ def test_ed25519_sign_and_verify(ed25519_keypair: Keypair) -> None:
         public_key=ed25519_pubkey,
         time=1_000_000,
         user_id=5,
+        key_identifier=0,
         signature_hex=None,
     )
 
@@ -161,4 +168,5 @@ def test_v1_raises() -> None:
             public_key=bytes(33),
             time=1,
             user_id=1,
+            key_identifier=0,
         )
