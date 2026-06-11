@@ -211,7 +211,8 @@ class WithdrawMessage(BaseMessage):
             )
         if version == 3:
             return (
-                f">3s {token_length}s Q b {destination_wallet_length}s Q Q Q {cls.SIGNATURE_LENGTH}s"
+                f">3s {token_length}s Q b {destination_wallet_length}s Q Q Q "
+                f"{cls.SIGNATURE_LENGTH}s"
             )
         return f">3s {token_length}s Q b {destination_wallet_length}s I I Q {cls.SIGNATURE_LENGTH}s"
 
