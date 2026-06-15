@@ -180,9 +180,7 @@ class WithdrawMessage(BaseMessage):
                 f">3s {token_length}s Q b {destination_wallet_length}s Q Q Q "
                 f"{cls.SIGNATURE_LENGTH}s"
             )
-        return (
-            f">3s {token_length}s Q b {destination_wallet_length}s Q Q {cls.SIGNATURE_LENGTH}s"
-        )
+        return f">3s {token_length}s Q b {destination_wallet_length}s Q Q {cls.SIGNATURE_LENGTH}s"
 
     @classmethod
     def get_format(cls, token_length: int, destination_wallet_length: int, version: int = 2) -> str:
