@@ -52,6 +52,18 @@ def _make_cancel_v2(sig: str | None = DUMMY_SIG) -> CancelMessage:
     )
 
 
+def _make_cancel_v3(sig: str | None = DUMMY_SIG) -> CancelMessage:
+    return CancelMessage(
+        version=3,
+        signature_type=SignatureType.SECP256K1,
+        order_nonce=None,
+        user_id=7,
+        order_timestamp=1_700_000_000,
+        key_identifier=5,
+        signature_hex=sig,
+    )
+
+
 # ---------------------------------------------------------------------------
 # BuyMessage v2
 # ---------------------------------------------------------------------------
@@ -145,6 +157,40 @@ def test_cancel_v2_order_nonce_accessible() -> None:
 
 def test_cancel_v2_sign_and_verify(private_key: PrivateKey) -> None:
     msg = _make_cancel_v2(sig=None)
+    msg.sign(private_key)
+    assert msg.verify_signature(private_key.public_key.format(compressed=True))
+
+
+# ---------------------------------------------------------------------------
+# CancelMessage v3
+# ---------------------------------------------------------------------------
+
+
+def test_cancel_v3_round_trip() -> None:
+    original = _make_cancel_v3()
+    reconstructed = CancelMessage.from_bytes(original.to_bytes())
+
+    assert reconstructed.version == 3
+    assert reconstructed.order_timestamp == 1_700_000_000
+    assert reconstructed.key_identifier == 5
+    assert reconstructed.user_id == 7
+    assert reconstructed.signature_hex == DUMMY_SIG
+
+
+def test_cancel_v3_order_nonce_raises() -> None:
+    msg = _make_cancel_v3()
+    with pytest.raises(AttributeError):
+        _ = msg.order_nonce
+
+
+def test_cancel_v2_order_timestamp_raises() -> None:
+    msg = _make_cancel_v2()
+    with pytest.raises(AttributeError):
+        _ = msg.order_timestamp
+
+
+def test_cancel_v3_sign_and_verify(private_key: PrivateKey) -> None:
+    msg = _make_cancel_v3(sig=None)
     msg.sign(private_key)
     assert msg.verify_signature(private_key.public_key.format(compressed=True))
 
