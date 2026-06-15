@@ -106,10 +106,6 @@ class AddPublicKeyMessage(BaseMessage):
 
     @classmethod
     def get_body_format(cls, public_key_length: int, key_mode: KeyMode) -> str:
-        """Return the struct format string for the message body.
-
-        The format depends on key_mode: TEMPORARY includes expiry, PERMANENT does not.
-        """
         prefix = f">I {public_key_length}s B"
         if key_mode == KeyMode.TEMPORARY:
             # expiry(I), time(Q), key_identifier(Q), user_id(Q), sig
