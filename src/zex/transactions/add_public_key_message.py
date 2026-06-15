@@ -73,7 +73,7 @@ class AddPublicKeyMessage(BaseMessage):
         self.key_signature_type = key_signature_type
         self.managed_key_id = managed_key_id
         self.key_mode = key_mode
-        self.expiry = expiry
+        self._expiry = expiry
         self.public_key = public_key
         self.time = time
         self.user_id = user_id
@@ -88,15 +88,21 @@ class AddPublicKeyMessage(BaseMessage):
         self.signature_hex = signature_hex
         self._transaction_bytes: bytes | None = None
 
-    @classmethod
-    def get_header_format(cls) -> str:
-        return ">BBBB"
-
     @property
     def key_identifier(self) -> int:
         if self._key_identifier is None:
             raise AttributeError("key_identifier is not available in v2 messages.")
         return self._key_identifier
+
+    @property
+    def expiry(self) -> int | None:
+        if self._expiry is None:
+            raise AttributeError("expiry is not available for permanent keys.")
+        return self._expiry
+
+    @classmethod
+    def get_header_format(cls) -> str:
+        return ">BBBB"
 
     @classmethod
     def get_body_format(cls, public_key_length: int, key_mode: KeyMode) -> str:
