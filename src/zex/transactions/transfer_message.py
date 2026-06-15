@@ -28,21 +28,19 @@ class TransferSchema(BaseModel):
     amount: str
     recipient_id: int
     t: int
-    nonce: int
     user_id: int
     signature: str
 
     def to_message(self) -> "TransferMessage":
         mantissa, exponent = to_scientific(Decimal(self.amount))
         return TransferMessage(
-            version=1,
+            version=2,
             signature_type=self.sig_type,
             token_name=self.token_name,
             amount_mantissa=mantissa,
             amount_exponent=exponent,
             recipient_id=self.recipient_id,
             time=self.t,
-            nonce=self.nonce,
             user_id=self.user_id,
             signature_hex=self.signature,
         )
@@ -61,12 +59,11 @@ class TransferMessage(BaseMessage):
         amount_exponent: int,
         recipient_id: int,
         time: int,
-        nonce: int | None,
         user_id: int,
         key_identifier: int | None = None,
         signature_hex: str | None = None,
     ) -> None:
-        if version not in (1, 2, 3):
+        if version not in (2, 3):
             raise MessageValidationError("Unsupported version.")
 
         self.version = version
@@ -78,12 +75,9 @@ class TransferMessage(BaseMessage):
         self.amount_exponent = amount_exponent
         self.recipient_id = recipient_id
         self.time = time
-        self._nonce = nonce
         self._key_identifier = key_identifier
         self.user_id = user_id
 
-        if version == 1 and nonce is None:
-            raise MessageValidationError("nonce is required for v1 messages.")
         if version == 3 and key_identifier is None:
             raise MessageValidationError("key_identifier is required for v3 messages.")
 
@@ -96,12 +90,6 @@ class TransferMessage(BaseMessage):
             raise MessageValidationError(
                 f"amount_exponent {amount_exponent} is too small (minimum: {min_exponent})"
             )
-
-    @property
-    def nonce(self) -> int:
-        if self._nonce is None:
-            raise AttributeError("nonce is not available in v2 messages.")
-        return self._nonce
 
     @property
     def key_identifier(self) -> int:
@@ -129,7 +117,7 @@ class TransferMessage(BaseMessage):
             raise UnexpectedCommandError("Unexpected command.")
         if token_length == 0:
             raise MessageFormatError("Invalid token length.")
-        if version not in (1, 2, 3):
+        if version not in (2, 3):
             raise MessageFormatError("Unsupported version.")
 
         body_format = cls.get_body_format(token_length, version)
@@ -138,22 +126,7 @@ class TransferMessage(BaseMessage):
             raise MessageFormatError("Transaction body is too short.")
         body_bytes = transaction_bytes[cls.HEADER_LENGTH : cls.HEADER_LENGTH + body_size]
 
-        if version == 1:
-            try:
-                (
-                    token_name_bytes,
-                    amount_mantissa,
-                    amount_exponent,
-                    recipient_id,
-                    time,
-                    nonce,
-                    user_id,
-                    signature_bytes,
-                ) = unpack(body_format, body_bytes)
-            except struct_error as e:
-                raise MessageFormatError(f"Failed to unpack body: {e}") from e
-            key_identifier = None
-        elif version == 2:
+        if version == 2:
             try:
                 (
                     token_name_bytes,
@@ -166,7 +139,6 @@ class TransferMessage(BaseMessage):
                 ) = unpack(body_format, body_bytes)
             except struct_error as e:
                 raise MessageFormatError(f"Failed to unpack body: {e}") from e
-            nonce = None
             key_identifier = None
         else:  # v3
             try:
@@ -182,7 +154,6 @@ class TransferMessage(BaseMessage):
                 ) = unpack(body_format, body_bytes)
             except struct_error as e:
                 raise MessageFormatError(f"Failed to unpack body: {e}") from e
-            nonce = None
 
         try:
             sig_type = SignatureType.from_int(signature_type)
@@ -197,7 +168,6 @@ class TransferMessage(BaseMessage):
             amount_exponent=amount_exponent,
             recipient_id=recipient_id,
             time=time,
-            nonce=nonce,
             user_id=user_id,
             key_identifier=key_identifier,
             signature_hex=signature_bytes.hex(),
@@ -210,18 +180,15 @@ class TransferMessage(BaseMessage):
         return ">BBBB"
 
     @classmethod
-    def get_body_format(cls, token_length: int, version: int = 1) -> str:
-        # v1: token | amt_m | amt_e | recipient_id | time(I) | nonce(I) | user_id | sig
+    def get_body_format(cls, token_length: int, version: int = 2) -> str:
         # v2: token | amt_m | amt_e | recipient_id | time(Q) | user_id | sig
         # v3: token | amt_m | amt_e | recipient_id | time(Q) | key_identifier(Q) | user_id | sig
-        if version == 2:
-            return f">{token_length}s Q b Q Q Q {cls.SIGNATURE_LENGTH}s"
         if version == 3:
             return f">{token_length}s Q b Q Q Q Q {cls.SIGNATURE_LENGTH}s"
-        return f">{token_length}s Q b Q I I Q {cls.SIGNATURE_LENGTH}s"
+        return f">{token_length}s Q b Q Q Q {cls.SIGNATURE_LENGTH}s"
 
     @classmethod
-    def get_format(cls, token_length: int, version: int = 1) -> str:
+    def get_format(cls, token_length: int, version: int = 2) -> str:
         return cls.get_header_format() + cls.get_body_format(token_length, version)[1:]
 
     def __str__(self) -> str:
@@ -233,8 +200,6 @@ class TransferMessage(BaseMessage):
             f"recipient_id: {self.recipient_id}",
             f"t: {self.time}",
         ]
-        if self.version == 1:
-            parts.append(f"nonce: {self._nonce}")
         if self.version == 3:
             parts.append(f"key_identifier: {self._key_identifier}")
         parts.append(f"user_id: {self.user_id}")
@@ -244,23 +209,7 @@ class TransferMessage(BaseMessage):
         if self._transaction_bytes is not None:
             return self._transaction_bytes
         assert self.signature_hex is not None
-        if self.version == 1:
-            transaction_bytes = pack(
-                TransferMessage.get_format(token_length=len(self.token_name), version=1),
-                self.version,
-                TransferMessage.TRANSACTION_TYPE.value,
-                self.signature_type.value,
-                len(self.token_name),
-                self.token_name.encode("ascii"),
-                self.amount_mantissa,
-                self.amount_exponent,
-                self.recipient_id,
-                self.time,
-                self._nonce,
-                self.user_id,
-                bytes.fromhex(self.signature_hex),
-            )
-        elif self.version == 2:
+        if self.version == 2:
             transaction_bytes = pack(
                 TransferMessage.get_format(token_length=len(self.token_name), version=2),
                 self.version,

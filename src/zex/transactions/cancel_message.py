@@ -21,7 +21,7 @@ class CancelSchema(BaseModel):
 
     def to_message(self) -> "CancelMessage":
         return CancelMessage(
-            version=1,
+            version=2,
             signature_type=self.sig_type,
             order_nonce=self.order_nonce,
             user_id=self.user_id,
@@ -42,7 +42,7 @@ class CancelMessage(BaseMessage):
         key_identifier: int | None = None,
         signature_hex: str | None = None,
     ) -> None:
-        if version not in (1, 2, 3):
+        if version not in (2, 3):
             raise MessageValidationError("Unsupported version.")
 
         self.signature_type = signature_type
@@ -60,7 +60,7 @@ class CancelMessage(BaseMessage):
         self._transaction_bytes: bytes | None = None
 
     @classmethod
-    def get_header_format(cls, version: int = 1) -> str:
+    def get_header_format(cls) -> str:
         return ">BBB"
 
     @property
@@ -70,16 +70,16 @@ class CancelMessage(BaseMessage):
         return self._key_identifier
 
     @classmethod
-    def get_body_format(cls, version: int = 1) -> str:
-        # v1/v2: user_id(Q) | order_nonce(Q) | sig
+    def get_body_format(cls, version: int = 2) -> str:
+        # v2: user_id(Q) | order_nonce(Q) | sig
         # v3: user_id(Q) | order_nonce(Q) | key_identifier(Q) | sig
         if version == 3:
             return f">QQQ {cls.SIGNATURE_LENGTH}s"
         return f">QQ {cls.SIGNATURE_LENGTH}s"
 
     @classmethod
-    def get_format(cls, version: int = 1) -> str:
-        return cls.get_header_format(version) + cls.get_body_format(version)[1:]
+    def get_format(cls, version: int = 2) -> str:
+        return cls.get_header_format() + cls.get_body_format(version)[1:]
 
     @classmethod
     def from_bytes(cls, transaction_bytes: bytes) -> "CancelMessage":
@@ -95,7 +95,7 @@ class CancelMessage(BaseMessage):
         except struct_error as e:
             raise HeaderFormatError(f"Failed to unpack header: {e}") from e
 
-        if version not in (1, 2, 3):
+        if version not in (2, 3):
             raise MessageFormatError("Unsupported version.")
         if command != cls.TRANSACTION_TYPE.value:
             raise UnexpectedCommandError("Unexpected command.")

@@ -9,7 +9,7 @@ def test_given_output_of_to_bytes_when_calling_from_bytes_then_construct_the_sam
 ) -> None:
     # Given
     original_buy_message = BuyMessage(
-        version=1,
+        version=2,
         signature_type=SignatureType.SECP256K1,
         base_token="BTC",
         quote_token="USDT",
@@ -18,7 +18,6 @@ def test_given_output_of_to_bytes_when_calling_from_bytes_then_construct_the_sam
         price_mantissa=1,
         price_exponent=5,
         time=10000,
-        nonce=1,
         user_id=1,
         signature_hex=dummy_signature_hex,
     )
@@ -36,13 +35,12 @@ def test_given_output_of_to_bytes_when_calling_from_bytes_then_construct_the_sam
     assert new_buy_message.price == original_buy_message.price
     assert new_buy_message.time == original_buy_message.time
     assert new_buy_message.signature_hex == original_buy_message.signature_hex
-    assert new_buy_message.nonce == original_buy_message.nonce
     assert new_buy_message.user_id == original_buy_message.user_id
 
 
 def test_ed25519_sign_and_verify(ed25519_keypair: Keypair) -> None:
     msg = BuyMessage(
-        version=1,
+        version=2,
         signature_type=SignatureType.ED25519,
         base_token="BTC",
         quote_token="USDT",
@@ -51,7 +49,6 @@ def test_ed25519_sign_and_verify(ed25519_keypair: Keypair) -> None:
         price_mantissa=1,
         price_exponent=5,
         time=10000,
-        nonce=1,
         user_id=1,
         signature_hex=None,
     )

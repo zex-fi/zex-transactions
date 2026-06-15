@@ -7,7 +7,7 @@ def test_given_output_of_to_bytes_when_calling_from_bytes_then_construct_the_sam
 ) -> None:
     # Given
     original_sell_message = SellMessage(
-        version=1,
+        version=2,
         signature_type=SignatureType.SECP256K1,
         base_token="BTC",
         quote_token="USDT",
@@ -16,7 +16,6 @@ def test_given_output_of_to_bytes_when_calling_from_bytes_then_construct_the_sam
         price_mantissa=1,
         price_exponent=5,
         time=10000,
-        nonce=1,
         user_id=1,
         signature_hex=dummy_signature_hex,
     )
@@ -34,5 +33,4 @@ def test_given_output_of_to_bytes_when_calling_from_bytes_then_construct_the_sam
     assert new_sell_message.price == original_sell_message.price
     assert new_sell_message.time == original_sell_message.time
     assert new_sell_message.signature_hex == original_sell_message.signature_hex
-    assert new_sell_message.nonce == original_sell_message.nonce
     assert new_sell_message.user_id == original_sell_message.user_id

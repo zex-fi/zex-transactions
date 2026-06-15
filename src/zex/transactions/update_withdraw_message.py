@@ -71,7 +71,7 @@ class UpdateWithdrawMessage(BaseMessage):
         frost_signature: bytes | None = None,
         ecdsa_signature: bytes | None = None,
     ) -> None:
-        if version not in (1, 2):
+        if version != 2:
             raise MessageValidationError("Unsupported version.")
         self.version = version
         self.chain = chain
@@ -113,7 +113,7 @@ class UpdateWithdrawMessage(BaseMessage):
             raise HeaderFormatError(f"Failed to unpack header: {e}") from e
         if command != cls.TRANSACTION_TYPE.value:
             raise UnexpectedCommandError("Unexpected command.")
-        if version not in (1, 2):
+        if version != 2:
             raise MessageFormatError("Unsupported version.")
         if withdraws_count == 0:
             raise MessageFormatError("Invalid withdraw count.")

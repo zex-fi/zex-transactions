@@ -21,7 +21,7 @@ class RegisterSchema(BaseModel):
 
     def to_message(self) -> "RegisterMessage":
         return RegisterMessage(
-            version=1,
+            version=2,
             signature_type=self.sig_type,
             referral_code=self.referral_code,
             public_key=self.public_key,
@@ -41,7 +41,7 @@ class RegisterMessage(BaseMessage):
         public_key: bytes,
         signature_hex: str | None = None,
     ) -> None:
-        if version not in (1, 2):
+        if version != 2:
             raise MessageValidationError("Unsupported version.")
 
         self.user_id = -1
@@ -69,7 +69,7 @@ class RegisterMessage(BaseMessage):
             raise HeaderFormatError(f"Failed to unpack header: {e}") from e
         if command != cls.TRANSACTION_TYPE.value:
             raise UnexpectedCommandError("Unexpected command.")
-        if version not in (1, 2):
+        if version != 2:
             raise MessageFormatError("Unsupported version.")
 
         try:

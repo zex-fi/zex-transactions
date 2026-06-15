@@ -51,7 +51,7 @@ class DepositMessage(BaseMessage):
         frost_signature: bytes | None = None,
         ecdsa_signature: bytes | None = None,
     ) -> None:
-        if version not in (1, 2):
+        if version != 2:
             raise MessageValidationError("Unsupported version.")
 
         self.version = version
@@ -194,7 +194,7 @@ class DepositMessage(BaseMessage):
         token_contract_length: int,
         version: int = 1,
     ) -> str:
-        time_fmt = "Q" if version == 2 else "I"
+        time_fmt = "Q"
         return (
             f">{transaction_hash_length}s {token_contract_length}s"
             f"{cls.AMOUNT_BYTES_LENGTH}s B {time_fmt} B"

@@ -37,7 +37,6 @@ def _make_buy_v2(sig: str | None = DUMMY_SIG) -> BuyMessage:
         price_mantissa=5,
         price_exponent=4,
         time=10_000,
-        nonce=None,
         user_id=1,
         signature_hex=sig,
     )
@@ -76,7 +75,7 @@ def test_buy_v2_nonce_raises() -> None:
         _ = msg.nonce
 
 
-def test_buy_v1_requires_nonce() -> None:
+def test_buy_v1_raises() -> None:
     with pytest.raises(MessageValidationError):
         BuyMessage(
             version=1,
@@ -88,7 +87,6 @@ def test_buy_v1_requires_nonce() -> None:
             price_mantissa=5,
             price_exponent=4,
             time=10_000,
-            nonce=None,
             user_id=1,
             signature_hex=DUMMY_SIG,
         )
@@ -121,7 +119,6 @@ def test_sell_v2_round_trip() -> None:
         price_mantissa=3,
         price_exponent=3,
         time=20_000,
-        nonce=None,
         user_id=5,
         signature_hex=DUMMY_SIG,
     )
@@ -171,7 +168,6 @@ def test_transfer_v2_round_trip() -> None:
         amount_exponent=0,
         recipient_id=99,
         time=1_000,
-        nonce=None,
         user_id=1,
         signature_hex=DUMMY_SIG,
     )
@@ -191,7 +187,6 @@ def test_transfer_v2_nonce_raises() -> None:
         amount_exponent=0,
         recipient_id=99,
         time=1_000,
-        nonce=None,
         user_id=1,
         signature_hex=DUMMY_SIG,
     )
@@ -214,7 +209,6 @@ def test_withdraw_v2_round_trip() -> None:
         amount_exponent=0,
         destination_wallet=b"\x01\x23\x45",
         time=1_000,
-        nonce=None,
         user_id=1,
         signature_hex=DUMMY_SIG,
     )
@@ -234,7 +228,6 @@ def test_withdraw_v2_nonce_raises() -> None:
         amount_exponent=0,
         destination_wallet=b"\x01\x23\x45",
         time=1_000,
-        nonce=None,
         user_id=1,
         signature_hex=DUMMY_SIG,
     )
@@ -253,7 +246,6 @@ def test_pause_v2_round_trip() -> None:
         signature_type=SignatureType.SECP256K1,
         is_set=True,
         time=1_000,
-        nonce=None,
         user_id=1,
         signature_hex=DUMMY_SIG,
     )
@@ -269,7 +261,6 @@ def test_pause_v2_nonce_raises() -> None:
         signature_type=SignatureType.SECP256K1,
         is_set=False,
         time=1_000,
-        nonce=None,
         user_id=1,
         signature_hex=DUMMY_SIG,
     )
