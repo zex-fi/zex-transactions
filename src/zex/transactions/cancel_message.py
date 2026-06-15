@@ -185,7 +185,7 @@ class CancelMessage(BaseMessage):
                 self._key_identifier,
                 bytes.fromhex(self.signature_hex),
             )
-        else:
+        else:  # version == 2
             transaction_bytes = pack(
                 CancelMessage.get_format(self.version),
                 self.version,
