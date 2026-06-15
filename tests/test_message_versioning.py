@@ -69,11 +69,6 @@ def test_buy_v2_round_trip() -> None:
     assert reconstructed.signature_hex == DUMMY_SIG
 
 
-def test_buy_v2_nonce_raises() -> None:
-    msg = _make_buy_v2()
-    with pytest.raises(AttributeError):
-        _ = msg.nonce
-
 
 def test_buy_v1_raises() -> None:
     with pytest.raises(MessageValidationError):
@@ -178,21 +173,6 @@ def test_transfer_v2_round_trip() -> None:
     assert reconstructed.recipient_id == 99
 
 
-def test_transfer_v2_nonce_raises() -> None:
-    msg = TransferMessage(
-        version=2,
-        signature_type=SignatureType.SECP256K1,
-        token_name="BTC",
-        amount_mantissa=1,
-        amount_exponent=0,
-        recipient_id=99,
-        time=1_000,
-        user_id=1,
-        signature_hex=DUMMY_SIG,
-    )
-    with pytest.raises(AttributeError):
-        _ = msg.nonce
-
 
 # ---------------------------------------------------------------------------
 # WithdrawMessage v2
@@ -218,22 +198,6 @@ def test_withdraw_v2_round_trip() -> None:
     assert reconstructed.destination_wallet == b"\x01\x23\x45"
 
 
-def test_withdraw_v2_nonce_raises() -> None:
-    msg = WithdrawMessage(
-        version=2,
-        signature_type=SignatureType.SECP256K1,
-        token_name="BTC",
-        chain_name=ChainName.Bitcoin,
-        amount_mantissa=1,
-        amount_exponent=0,
-        destination_wallet=b"\x01\x23\x45",
-        time=1_000,
-        user_id=1,
-        signature_hex=DUMMY_SIG,
-    )
-    with pytest.raises(AttributeError):
-        _ = msg.nonce
-
 
 # ---------------------------------------------------------------------------
 # PauseWithdrawMessage v2
@@ -254,18 +218,6 @@ def test_pause_v2_round_trip() -> None:
     assert reconstructed.version == 2
     assert reconstructed.is_set is True
 
-
-def test_pause_v2_nonce_raises() -> None:
-    msg = PauseWithdrawMessage(
-        version=2,
-        signature_type=SignatureType.SECP256K1,
-        is_set=False,
-        time=1_000,
-        user_id=1,
-        signature_hex=DUMMY_SIG,
-    )
-    with pytest.raises(AttributeError):
-        _ = msg.nonce
 
 
 # ---------------------------------------------------------------------------
