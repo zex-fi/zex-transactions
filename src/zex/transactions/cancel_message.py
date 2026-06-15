@@ -65,10 +65,6 @@ class CancelMessage(BaseMessage):
 
         self._transaction_bytes: bytes | None = None
 
-    @classmethod
-    def get_header_format(cls) -> str:
-        return ">BBB"
-
     @property
     def order_nonce(self) -> int:
         if self._order_nonce is None:
@@ -86,6 +82,10 @@ class CancelMessage(BaseMessage):
         if self._key_identifier is None:
             raise AttributeError("key_identifier is not available in v1/v2 messages.")
         return self._key_identifier
+
+    @classmethod
+    def get_header_format(cls) -> str:
+        return ">BBB"
 
     @classmethod
     def get_body_format(cls, version: int = 2) -> str:
