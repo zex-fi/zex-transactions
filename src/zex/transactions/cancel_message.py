@@ -132,7 +132,7 @@ class CancelMessage(BaseMessage):
             except struct_error as e:
                 raise MessageFormatError(f"Failed to unpack body: {e}") from e
             order_nonce = None
-        else:
+        else:  # version 2
             try:
                 user_id, order_nonce, signature_bytes = unpack(body_format, body_bytes)
             except struct_error as e:
