@@ -42,6 +42,23 @@ def _make_buy_v2(sig: str | None = DUMMY_SIG) -> BuyMessage:
     )
 
 
+def _make_buy_v3(sig: str | None = DUMMY_SIG) -> BuyMessage:
+    return BuyMessage(
+        version=3,
+        signature_type=SignatureType.SECP256K1,
+        base_token="BTC",
+        quote_token="USDT",
+        amount_mantissa=1,
+        amount_exponent=0,
+        price_mantissa=5,
+        price_exponent=4,
+        time=10_000,
+        user_id=1,
+        key_identifier=3,
+        signature_hex=sig,
+    )
+
+
 def _make_cancel_v2(sig: str | None = DUMMY_SIG) -> CancelMessage:
     return CancelMessage(
         version=2,
@@ -111,6 +128,30 @@ def test_buy_v2_to_bytes_caches() -> None:
 
 
 # ---------------------------------------------------------------------------
+# BuyMessage v3
+# ---------------------------------------------------------------------------
+
+
+def test_buy_v3_round_trip() -> None:
+    original = _make_buy_v3()
+    reconstructed = BuyMessage.from_bytes(original.to_bytes())
+
+    assert reconstructed.version == 3
+    assert reconstructed.base_token == "BTC"
+    assert reconstructed.quote_token == "USDT"
+    assert reconstructed.time == 10_000
+    assert reconstructed.user_id == 1
+    assert reconstructed.key_identifier == 3
+    assert reconstructed.signature_hex == DUMMY_SIG
+
+
+def test_buy_v3_sign_and_verify(private_key: PrivateKey) -> None:
+    msg = _make_buy_v3(sig=None)
+    msg.sign(private_key)
+    assert msg.verify_signature(private_key.public_key.format(compressed=True))
+
+
+# ---------------------------------------------------------------------------
 # SellMessage v2
 # ---------------------------------------------------------------------------
 
@@ -133,6 +174,33 @@ def test_sell_v2_round_trip() -> None:
 
     assert reconstructed.version == 2
     assert reconstructed.user_id == 5
+
+
+# ---------------------------------------------------------------------------
+# SellMessage v3
+# ---------------------------------------------------------------------------
+
+
+def test_sell_v3_round_trip() -> None:
+    original = SellMessage(
+        version=3,
+        signature_type=SignatureType.SECP256K1,
+        base_token="ETH",
+        quote_token="USDC",
+        amount_mantissa=2,
+        amount_exponent=0,
+        price_mantissa=3,
+        price_exponent=3,
+        time=20_000,
+        user_id=5,
+        key_identifier=9,
+        signature_hex=DUMMY_SIG,
+    )
+    reconstructed = SellMessage.from_bytes(original.to_bytes())
+
+    assert reconstructed.version == 3
+    assert reconstructed.user_id == 5
+    assert reconstructed.key_identifier == 9
 
 
 # ---------------------------------------------------------------------------
@@ -219,6 +287,31 @@ def test_transfer_v2_round_trip() -> None:
     assert reconstructed.recipient_id == 99
 
 
+# ---------------------------------------------------------------------------
+# TransferMessage v3
+# ---------------------------------------------------------------------------
+
+
+def test_transfer_v3_round_trip() -> None:
+    original = TransferMessage(
+        version=3,
+        signature_type=SignatureType.SECP256K1,
+        token_name="BTC",
+        amount_mantissa=1,
+        amount_exponent=0,
+        recipient_id=99,
+        time=1_000,
+        user_id=1,
+        key_identifier=11,
+        signature_hex=DUMMY_SIG,
+    )
+    reconstructed = TransferMessage.from_bytes(original.to_bytes())
+
+    assert reconstructed.version == 3
+    assert reconstructed.user_id == 1
+    assert reconstructed.recipient_id == 99
+    assert reconstructed.key_identifier == 11
+
 
 # ---------------------------------------------------------------------------
 # WithdrawMessage v2
@@ -244,6 +337,31 @@ def test_withdraw_v2_round_trip() -> None:
     assert reconstructed.destination_wallet == b"\x01\x23\x45"
 
 
+# ---------------------------------------------------------------------------
+# WithdrawMessage v3
+# ---------------------------------------------------------------------------
+
+
+def test_withdraw_v3_round_trip() -> None:
+    original = WithdrawMessage(
+        version=3,
+        signature_type=SignatureType.SECP256K1,
+        token_name="BTC",
+        chain_name=ChainName.Bitcoin,
+        amount_mantissa=1,
+        amount_exponent=0,
+        destination_wallet=b"\x01\x23\x45",
+        time=1_000,
+        user_id=1,
+        key_identifier=13,
+        signature_hex=DUMMY_SIG,
+    )
+    reconstructed = WithdrawMessage.from_bytes(original.to_bytes())
+
+    assert reconstructed.version == 3
+    assert reconstructed.destination_wallet == b"\x01\x23\x45"
+    assert reconstructed.key_identifier == 13
+
 
 # ---------------------------------------------------------------------------
 # PauseWithdrawMessage v2
@@ -264,6 +382,27 @@ def test_pause_v2_round_trip() -> None:
     assert reconstructed.version == 2
     assert reconstructed.is_set is True
 
+
+# ---------------------------------------------------------------------------
+# PauseWithdrawMessage v3
+# ---------------------------------------------------------------------------
+
+
+def test_pause_v3_round_trip() -> None:
+    original = PauseWithdrawMessage(
+        version=3,
+        signature_type=SignatureType.SECP256K1,
+        is_set=True,
+        time=1_000,
+        user_id=1,
+        key_identifier=17,
+        signature_hex=DUMMY_SIG,
+    )
+    reconstructed = PauseWithdrawMessage.from_bytes(original.to_bytes())
+
+    assert reconstructed.version == 3
+    assert reconstructed.is_set is True
+    assert reconstructed.key_identifier == 17
 
 
 # ---------------------------------------------------------------------------
