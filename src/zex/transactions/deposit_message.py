@@ -100,7 +100,7 @@ class DepositMessage(BaseMessage):
             raise MessageFormatError("Unsupported version.")
 
         single_deposit_part1_format = cls.get_body_format_part1(
-            transaction_hash_length, token_contract_length, version=version
+            transaction_hash_length, token_contract_length
         )
         single_deposit_part1_length = calcsize(single_deposit_part1_format)
 
@@ -180,7 +180,6 @@ class DepositMessage(BaseMessage):
         body_format_part1 = cls.get_body_format_part1(
             transaction_hash_length=transaction_hash_length,
             token_contract_length=token_contrant_length,
-            version=version,
         )
         for salt_length in salt_lengths:
             body_format_part2 = cls.get_body_format_part2(salt_length)
@@ -192,7 +191,6 @@ class DepositMessage(BaseMessage):
         cls,
         transaction_hash_length: int,
         token_contract_length: int,
-        version: int = 1,
     ) -> str:
         time_fmt = "Q"
         return (
