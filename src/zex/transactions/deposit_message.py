@@ -51,7 +51,7 @@ class DepositMessage(BaseMessage):
         frost_signature: bytes | None = None,
         ecdsa_signature: bytes | None = None,
     ) -> None:
-        if version != 2:
+        if version not in (2, 3):
             raise MessageValidationError("Unsupported version.")
 
         self.version = version
@@ -96,7 +96,7 @@ class DepositMessage(BaseMessage):
             raise HeaderFormatError(f"Failed to unpack header: {e}") from e
         if command != cls.TRANSACTION_TYPE.value:
             raise UnexpectedCommandError("Unexpected command.")
-        if version not in (1, 2):
+        if version not in (2, 3):
             raise MessageFormatError("Unsupported version.")
 
         single_deposit_part1_format = cls.get_body_format_part1(
@@ -174,7 +174,6 @@ class DepositMessage(BaseMessage):
         transaction_hash_length: int,
         token_contrant_length: int,
         salt_lengths: list[int],
-        version: int = 1,
     ) -> str:
         result = ">"
         body_format_part1 = cls.get_body_format_part1(
@@ -212,7 +211,6 @@ class DepositMessage(BaseMessage):
         transaction_hash_length: int,
         token_contranct_length: int,
         salt_lengths: list[int],
-        version: int = 1,
     ) -> str:
         return (
             cls.get_header_format()
@@ -220,7 +218,6 @@ class DepositMessage(BaseMessage):
                 transaction_hash_length,
                 token_contranct_length,
                 salt_lengths,
-                version=version,
             )[1:]
         )
 
@@ -237,7 +234,6 @@ class DepositMessage(BaseMessage):
                 transaction_hash_length,
                 token_contranct_length,
                 salt_lengths,
-                version=version,
             )
             + cls.get_signature_format()[1:]
         )
@@ -262,7 +258,6 @@ class DepositMessage(BaseMessage):
                 self.transaction_hash_length,
                 self.token_contract_length,
                 salt_lengths=[deposit.salt_length for deposit in self.deposits],
-                version=self.version,
             ),
             *self._get_message_arguments(),
         )
