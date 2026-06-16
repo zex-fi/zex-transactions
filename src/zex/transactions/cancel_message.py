@@ -80,7 +80,7 @@ class CancelMessage(BaseMessage):
     @property
     def key_identifier(self) -> int:
         if self._key_identifier is None:
-            raise AttributeError("key_identifier is not available in v1/v2 messages.")
+            raise AttributeError("key_identifier is not available in v2 messages.")
         return self._key_identifier
 
     @classmethod
