@@ -50,7 +50,7 @@ class LoginMessage(BaseMessage):
         hmac: bytes,
         signature_hex: str | None = None,
     ) -> None:
-        if version != 2:
+        if version not in (2, 3):
             raise MessageValidationError("Unsupported version.")
 
         self.user_id = -1
@@ -94,7 +94,7 @@ class LoginMessage(BaseMessage):
             raise HeaderFormatError(f"Failed to unpack header: {e}") from e
         if command != cls.TRANSACTION_TYPE.value:
             raise UnexpectedCommandError("Unexpected command.")
-        if version != 2:
+        if version not in (2, 3):
             raise MessageFormatError("Unsupported version.")
 
         try:
