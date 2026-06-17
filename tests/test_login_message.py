@@ -9,7 +9,7 @@ from zex.utils.zex_types import SignatureType, TransactionType
 
 def _make_secp_login(private_key: PrivateKey) -> LoginMessage:
     msg = LoginMessage(
-        version=1,
+        version=2,
         signature_type=SignatureType.SECP256K1,
         public_key=private_key.public_key.format(compressed=True),
         timestamp=1_700_000_000,
@@ -21,7 +21,7 @@ def _make_secp_login(private_key: PrivateKey) -> LoginMessage:
 
 def _make_ed_login(keypair: Keypair) -> LoginMessage:
     msg = LoginMessage(
-        version=1,
+        version=2,
         signature_type=SignatureType.ED25519,
         public_key=bytes(keypair.pubkey()),
         timestamp=1_700_000_000,
@@ -91,7 +91,7 @@ def test_different_keypair_fails_verification(private_key: PrivateKey) -> None:
 def test_wrong_public_key_length_secp256k1_raises() -> None:
     with pytest.raises(MessageValidationError):
         LoginMessage(
-            version=1,
+            version=2,
             signature_type=SignatureType.SECP256K1,
             public_key=b"\x02" * 32,  # ed25519 length under secp
             timestamp=1,
@@ -102,7 +102,7 @@ def test_wrong_public_key_length_secp256k1_raises() -> None:
 def test_wrong_public_key_length_ed25519_raises() -> None:
     with pytest.raises(MessageValidationError):
         LoginMessage(
-            version=1,
+            version=2,
             signature_type=SignatureType.ED25519,
             public_key=b"\x02" * 33,  # secp length under ed25519
             timestamp=1,
@@ -113,7 +113,7 @@ def test_wrong_public_key_length_ed25519_raises() -> None:
 def test_wrong_hmac_length_raises() -> None:
     with pytest.raises(MessageValidationError):
         LoginMessage(
-            version=1,
+            version=2,
             signature_type=SignatureType.ED25519,
             public_key=b"\x02" * 32,
             timestamp=1,
@@ -124,7 +124,7 @@ def test_wrong_hmac_length_raises() -> None:
 def test_version_validation_raises() -> None:
     with pytest.raises(MessageValidationError):
         LoginMessage(
-            version=3,
+            version=1,
             signature_type=SignatureType.SECP256K1,
             public_key=b"\x02" * 33,
             timestamp=1,

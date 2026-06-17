@@ -72,7 +72,7 @@ class TestUpdateWithdrawRoundTrip:
 
 
 def _build_transaction_bytes(
-    version: int = 1,
+    version: int = 2,
     command: bytes = b"u",
     chain: ChainName = ChainName.Ethereum,
     status: UpdateWithdrawMessageStatus = UpdateWithdrawMessageStatus.REJECTED,
@@ -129,7 +129,7 @@ class TestUpdateWithdrawMessageFromBytes:
         invalid_status = 0xFF  # not a valid UpdateWithdrawStatus value
         header = pack(
             UpdateWithdrawMessage.get_header_format(),
-            1,
+            2,
             int.from_bytes(b"u"),
             ChainName.Ethereum.abbreviation.encode("utf-8"),
             invalid_status,
@@ -148,7 +148,7 @@ class TestUpdateWithdrawMessageFromBytes:
         tx_hash_length = 4
         header = pack(
             UpdateWithdrawMessage.get_header_format(),
-            1,
+            2,
             int.from_bytes(b"u"),
             ChainName.Ethereum.abbreviation.encode("utf-8"),
             UpdateWithdrawMessageStatus.SUCCESSFUL.value,
@@ -167,7 +167,7 @@ class TestUpdateWithdrawMessageFromBytes:
         tx_hash_length = 4
         header = pack(
             UpdateWithdrawMessage.get_header_format(),
-            1,
+            2,
             int.from_bytes(b"u"),
             ChainName.Ethereum.abbreviation.encode("utf-8"),
             UpdateWithdrawMessageStatus.SUCCESSFUL.value,
@@ -182,9 +182,9 @@ class TestUpdateWithdrawMessageFromBytes:
     def test_given_valid_single_withdraw_when_calling_from_bytes_then_returns_correct_version(
         self,
     ) -> None:
-        data = _build_transaction_bytes(version=1, frost_sig=self.FROST_SIG, ecdsa_sig=self.ECDSA_SIG)
+        data = _build_transaction_bytes(version=2, frost_sig=self.FROST_SIG, ecdsa_sig=self.ECDSA_SIG)
         msg = UpdateWithdrawMessage.from_bytes(data)
-        assert msg.version == 1
+        assert msg.version == 2
 
     def test_given_rejected_message_when_calling_from_bytes_then_status_is_rejected(
         self,
@@ -250,7 +250,7 @@ class TestUpdateWithdrawMessageFromBytes:
 
 
 def _build_message(
-    version: int = 1,
+    version: int = 2,
     chain: ChainName = ChainName.Ethereum,
     status: UpdateWithdrawMessageStatus = UpdateWithdrawMessageStatus.REJECTED,
     withdraws: list[UpdatedWithdrawal] | None = None,
@@ -276,7 +276,7 @@ class TestUpdateWithdrawMessageInit:
     ) -> None:
         with pytest.raises(ValueError, match="frost signature"):
             UpdateWithdrawMessage(
-                version=1,
+                version=2,
                 chain=ChainName.Ethereum,
                 status=UpdateWithdrawMessageStatus.REJECTED,
                 transaction_hash_length=0,
@@ -289,7 +289,7 @@ class TestUpdateWithdrawMessageInit:
     ) -> None:
         with pytest.raises(ValueError, match="ecdsa signature"):
             UpdateWithdrawMessage(
-                version=1,
+                version=2,
                 chain=ChainName.Ethereum,
                 status=UpdateWithdrawMessageStatus.REJECTED,
                 transaction_hash_length=0,
@@ -299,7 +299,7 @@ class TestUpdateWithdrawMessageInit:
 
     def test_given_none_signatures_when_creating_then_attributes_are_none(self) -> None:
         msg = UpdateWithdrawMessage(
-            version=1,
+            version=2,
             chain=ChainName.Ethereum,
             status=UpdateWithdrawMessageStatus.REJECTED,
             transaction_hash_length=0,
@@ -310,7 +310,7 @@ class TestUpdateWithdrawMessageInit:
 
     def test_given_zero_transaction_hash_length_when_creating_then_accepted(self) -> None:
         msg = UpdateWithdrawMessage(
-            version=1,
+            version=2,
             chain=ChainName.Ethereum,
             status=UpdateWithdrawMessageStatus.REJECTED,
             transaction_hash_length=0,
@@ -323,7 +323,7 @@ class TestUpdateWithdrawMessageInit:
     ) -> None:
         with pytest.raises(ValueError, match="All withdraw tx_hash lengths must match transaction_hash_length"):
             UpdateWithdrawMessage(
-                version=1,
+                version=2,
                 chain=ChainName.Ethereum,
                 status=UpdateWithdrawMessageStatus.SUCCESSFUL,
                 transaction_hash_length=4,
@@ -335,7 +335,7 @@ class TestUpdateWithdrawMessageInit:
     ) -> None:
         with pytest.raises(ValueError, match="All withdraw tx_hash lengths must match transaction_hash_length"):
             UpdateWithdrawMessage(
-                version=1,
+                version=2,
                 chain=ChainName.Ethereum,
                 status=UpdateWithdrawMessageStatus.SUCCESSFUL,
                 transaction_hash_length=4,
@@ -498,7 +498,7 @@ class TestUpdateWithdrawMessageRoundTrip:
     ) -> None:
         # Given
         data = _build_transaction_bytes(
-            version=1,
+            version=2,
             status=UpdateWithdrawMessageStatus.SUCCESSFUL,
             withdraws=[UpdatedWithdrawal(id=123, tx_hash=b"\xca\xfe\xba\xbe")],
             frost_sig=self.FROST_SIG,
@@ -522,7 +522,7 @@ class TestUpdateWithdrawMessageRoundTrip:
     ) -> None:
         # Given
         data = _build_transaction_bytes(
-            version=1,
+            version=2,
             status=UpdateWithdrawMessageStatus.SUCCESSFUL,
             withdraws=[UpdatedWithdrawal(id=123, tx_hash=b"\xca\xfe\xba\xbe")],
             frost_sig=self.FROST_SIG,

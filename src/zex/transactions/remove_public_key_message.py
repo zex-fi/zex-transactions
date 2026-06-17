@@ -18,31 +18,22 @@ class RemovePublicKeySchema(BaseModel):
     managed_key_id: int
     time: int
     user_id: int
+    key_identifier: int
     signature: str
 
     def to_message(self) -> "RemovePublicKeyMessage":
         return RemovePublicKeyMessage(
-            version=2,
+            version=3,
             signature_type=self.sig_type,
             managed_key_id=self.managed_key_id,
             time=self.time,
             user_id=self.user_id,
+            key_identifier=self.key_identifier,
             signature_hex=self.signature,
         )
 
 
 class RemovePublicKeyMessage(BaseMessage):
-    """Remove a secondary public key from a user account.
-
-    Identifies the key to remove by its ``managed_key_id``.  The signing key
-    is identified by ``key_identifier``.
-
-    Wire format (v2 only)
-    ---------------------
-    Header (3 bytes):  version=2 | command='k' | signature_type
-    Body:              managed_key_id | time | key_identifier | user_id | signature
-    """
-
     TRANSACTION_TYPE = TransactionType.REMOVE_PUBLIC_KEY
     HEADER_LENGTH = 3
 
@@ -53,9 +44,10 @@ class RemovePublicKeyMessage(BaseMessage):
         managed_key_id: int,
         time: int,
         user_id: int,
+        key_identifier: int,
         signature_hex: str | None = None,
     ) -> None:
-        if version != 2:
+        if version != 3:
             raise MessageValidationError("Unsupported version.")
 
         self.version = version
@@ -63,6 +55,7 @@ class RemovePublicKeyMessage(BaseMessage):
         self.managed_key_id = managed_key_id
         self.time = time
         self.user_id = user_id
+        self._key_identifier = key_identifier
 
         self.validate_signature(signature_hex)
         self.signature_hex = signature_hex
@@ -72,23 +65,30 @@ class RemovePublicKeyMessage(BaseMessage):
     def get_header_format(cls) -> str:
         return ">BBB"
 
+    @property
+    def key_identifier(self) -> int:
+        if self._key_identifier is None:
+            raise AttributeError("key_identifier is not available in v2 messages.")
+        return self._key_identifier
+
     @classmethod
     def get_body_format(cls) -> str:
-        # managed_key_id | time(Q) | user_id | sig
-        return f">I Q Q {cls.SIGNATURE_LENGTH}s"
+        return f">I Q Q Q {cls.SIGNATURE_LENGTH}s"
 
     @classmethod
     def get_format(cls) -> str:
         return cls.get_header_format() + cls.get_body_format()[1:]
 
     def __str__(self) -> str:
-        return (
-            f"v: {self.version}\n"
-            "name: remove_public_key\n"
-            f"user_id: {self.user_id}\n"
-            f"managed_key_id: {self.managed_key_id}\n"
-            f"time: {self.time}\n"
-        )
+        parts = [
+            f"v: {self.version}",
+            "name: remove_public_key",
+            f"user_id: {self.user_id}",
+            f"managed_key_id: {self.managed_key_id}",
+            f"time: {self.time}",
+            f"key_identifier: {self._key_identifier}",
+        ]
+        return "\n".join(parts) + "\n"
 
     def to_bytes(self) -> bytes:
         if self._transaction_bytes is not None:
@@ -101,6 +101,7 @@ class RemovePublicKeyMessage(BaseMessage):
             self.signature_type.value,
             self.managed_key_id,
             self.time,
+            self._key_identifier,
             self.user_id,
             bytes.fromhex(self.signature_hex),
         )
@@ -118,7 +119,7 @@ class RemovePublicKeyMessage(BaseMessage):
             raise HeaderFormatError(f"Failed to unpack header: {e}") from e
         if command != cls.TRANSACTION_TYPE.value:
             raise UnexpectedCommandError("Unexpected command.")
-        if version != 2:
+        if version != 3:
             raise MessageFormatError("Unsupported version.")
 
         body_format = cls.get_body_format()
@@ -128,7 +129,9 @@ class RemovePublicKeyMessage(BaseMessage):
         body_bytes = transaction_bytes[cls.HEADER_LENGTH : cls.HEADER_LENGTH + body_size]
 
         try:
-            managed_key_id, time, user_id, signature_bytes = unpack(body_format, body_bytes)
+            managed_key_id, time, key_identifier, user_id, signature_bytes = unpack(
+                body_format, body_bytes
+            )
         except struct_error as e:
             raise MessageFormatError(f"Failed to unpack body: {e}") from e
 
@@ -138,6 +141,7 @@ class RemovePublicKeyMessage(BaseMessage):
             managed_key_id=managed_key_id,
             time=time,
             user_id=user_id,
+            key_identifier=key_identifier,
             signature_hex=signature_bytes.hex(),
         )
         message._transaction_bytes = transaction_bytes

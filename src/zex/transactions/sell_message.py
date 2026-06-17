@@ -18,7 +18,6 @@ class SellSchema(BaseModel):
     amount: str
     price: str
     t: int
-    nonce: int
     user_id: int
     signature: str
 
@@ -26,7 +25,7 @@ class SellSchema(BaseModel):
         amount_mantissa, amount_exponent = to_scientific(Decimal(self.amount))
         price_mantissa, price_exponent = to_scientific(Decimal(self.price))
         return SellMessage(
-            version=1,
+            version=2,
             signature_type=self.sig_type,
             base_token=self.base_token,
             quote_token=self.quote_token,
@@ -35,7 +34,6 @@ class SellSchema(BaseModel):
             price_mantissa=price_mantissa,
             price_exponent=price_exponent,
             time=self.t,
-            nonce=self.nonce,
             user_id=self.user_id,
             signature_hex=self.signature,
         )
