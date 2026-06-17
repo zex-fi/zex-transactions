@@ -227,7 +227,6 @@ class DepositMessage(BaseMessage):
         transaction_hash_length: int,
         token_contranct_length: int,
         salt_lengths: list[int],
-        version: int = 1,
     ) -> str:
         return (
             cls.get_message_format(
