@@ -106,8 +106,8 @@ class AddPublicKeyMessage(BaseMessage):
     def get_body_format(cls, public_key_length: int, key_mode: KeyMode) -> str:
         prefix = f">I {public_key_length}s"
         if key_mode == KeyMode.TEMPORARY:
-            # expiry(I), time(Q), key_identifier(Q), user_id(Q), sig
-            suffix = f"I Q Q Q {cls.SIGNATURE_LENGTH}s"
+            # expiry(Q), time(Q), key_identifier(Q), user_id(Q), sig
+            suffix = f"Q Q Q Q {cls.SIGNATURE_LENGTH}s"
         else:
             # time(Q), key_identifier(Q), user_id(Q), sig
             suffix = f"Q Q Q {cls.SIGNATURE_LENGTH}s"
