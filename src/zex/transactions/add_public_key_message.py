@@ -194,9 +194,7 @@ class AddPublicKeyMessage(BaseMessage):
                     body_format, body_bytes
                 )
             else:  # PERMANENT
-                pub_key, time, key_identifier, user_id, sig_bytes = unpack(
-                    body_format, body_bytes
-                )
+                pub_key, time, key_identifier, user_id, sig_bytes = unpack(body_format, body_bytes)
                 expiry = None
         except struct_error as e:
             raise MessageFormatError(f"Failed to unpack body: {e}") from e
