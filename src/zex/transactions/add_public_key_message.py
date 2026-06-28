@@ -22,7 +22,6 @@ class KeyMode(Enum):
 class AddPublicKeySchema(BaseModel):
     sig_type: SignatureType
     key_signature_type: SignatureType
-    managed_key_id: int
     key_mode: KeyMode
     expiry: int | None
     public_key: bytes
@@ -36,7 +35,6 @@ class AddPublicKeySchema(BaseModel):
             version=3,
             signature_type=self.sig_type,
             key_signature_type=self.key_signature_type,
-            managed_key_id=self.managed_key_id,
             key_mode=self.key_mode,
             expiry=self.expiry,
             public_key=self.public_key,
@@ -56,7 +54,6 @@ class AddPublicKeyMessage(BaseMessage):
         version: int,
         signature_type: SignatureType,
         key_signature_type: SignatureType,
-        managed_key_id: int,
         key_mode: KeyMode,
         expiry: int | None,
         public_key: bytes,
@@ -71,7 +68,6 @@ class AddPublicKeyMessage(BaseMessage):
         self.version = version
         self.signature_type = signature_type
         self.key_signature_type = key_signature_type
-        self.managed_key_id = managed_key_id
         self.key_mode = key_mode
         self._expiry = expiry
         self.public_key = public_key
@@ -104,7 +100,7 @@ class AddPublicKeyMessage(BaseMessage):
 
     @classmethod
     def get_body_format(cls, public_key_length: int, key_mode: KeyMode) -> str:
-        prefix = f">I {public_key_length}s"
+        prefix = f">{public_key_length}s"
         if key_mode == KeyMode.TEMPORARY:
             # expiry(Q), time(Q), key_identifier(Q), user_id(Q), sig
             suffix = f"Q Q Q Q {cls.SIGNATURE_LENGTH}s"
@@ -123,7 +119,6 @@ class AddPublicKeyMessage(BaseMessage):
             f"v: {self.version}",
             "name: add_public_key",
             f"user_id: {self.user_id}",
-            f"managed_key_id: {self.managed_key_id}",
             f"key_mode: {self.key_mode.name.lower()}",
         ]
         if self.key_mode == KeyMode.TEMPORARY:
@@ -148,7 +143,6 @@ class AddPublicKeyMessage(BaseMessage):
             self.signature_type.value,
             self.key_signature_type.value,
             self.key_mode.value,
-            self.managed_key_id,
             self.public_key,
         ]
         if self.key_mode == KeyMode.TEMPORARY:
@@ -196,11 +190,11 @@ class AddPublicKeyMessage(BaseMessage):
 
         try:
             if key_mode == KeyMode.TEMPORARY:
-                managed_key_id, pub_key, expiry, time, key_identifier, user_id, sig_bytes = unpack(
+                pub_key, expiry, time, key_identifier, user_id, sig_bytes = unpack(
                     body_format, body_bytes
                 )
             else:  # PERMANENT
-                managed_key_id, pub_key, time, key_identifier, user_id, sig_bytes = unpack(
+                pub_key, time, key_identifier, user_id, sig_bytes = unpack(
                     body_format, body_bytes
                 )
                 expiry = None
@@ -211,7 +205,6 @@ class AddPublicKeyMessage(BaseMessage):
             version=version,
             signature_type=sig_type,
             key_signature_type=key_sig_type,
-            managed_key_id=managed_key_id,
             key_mode=key_mode,
             expiry=expiry,
             public_key=pub_key,

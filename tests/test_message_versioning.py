@@ -415,7 +415,6 @@ def test_add_public_key_v3_permanent_round_trip() -> None:
         version=3,
         signature_type=SignatureType.SECP256K1,
         key_signature_type=SignatureType.SECP256K1,
-        managed_key_id=10,
         key_mode=KeyMode.PERMANENT,
         expiry=None,
         public_key=SECP256K1_PUBKEY,
@@ -427,7 +426,6 @@ def test_add_public_key_v3_permanent_round_trip() -> None:
     reconstructed = AddPublicKeyMessage.from_bytes(original.to_bytes())
 
     assert reconstructed.version == 3
-    assert reconstructed.managed_key_id == 10
     assert reconstructed.key_mode == KeyMode.PERMANENT
     assert reconstructed.expiry is None
     assert reconstructed.public_key == SECP256K1_PUBKEY
@@ -439,7 +437,6 @@ def test_add_public_key_v3_temporary_round_trip() -> None:
         version=3,
         signature_type=SignatureType.SECP256K1,
         key_signature_type=SignatureType.SECP256K1,
-        managed_key_id=11,
         key_mode=KeyMode.TEMPORARY,
         expiry=2_000_000_000,
         public_key=SECP256K1_PUBKEY,
@@ -453,7 +450,6 @@ def test_add_public_key_v3_temporary_round_trip() -> None:
     assert reconstructed.version == 3
     assert reconstructed.key_mode == KeyMode.TEMPORARY
     assert reconstructed.expiry == 2_000_000_000
-    assert reconstructed.managed_key_id == 11
     assert reconstructed.key_identifier == 3
 
 
