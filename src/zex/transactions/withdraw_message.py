@@ -193,8 +193,8 @@ class WithdrawMessage(BaseMessage):
         amount = format_decimal(Decimal(self.amount_mantissa) * 10 ** Decimal(self.amount_exponent))
         try:
             destination_str = self.chain.address_to_str(self.destination_wallet)
-        except ChainNameInvalidValueError as e:
-            raise MessageFormatError("destination_wallet is not valid") from e
+        except ChainNameInvalidValueError:
+            destination_str = f"<invalid:0x{self.destination_wallet.hex()}>"
         parts = [
             f"v: {self.version}",
             "name: withdraw",

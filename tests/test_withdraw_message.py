@@ -32,3 +32,27 @@ def test_given_output_of_to_bytes_when_calling_from_bytes_then_construct_the_sam
     assert new_withdraw_message.amount == original_withdraw_message.amount
     assert new_withdraw_message.destination_wallet == original_withdraw_message.destination_wallet
     assert new_withdraw_message.chain == original_withdraw_message.chain
+
+
+def test_given_malformed_destination_wallet_when_calling_str_then_do_not_raise(
+    dummy_signature_hex: str
+) -> None:
+    # Given
+    withdraw_message = WithdrawMessage(
+        version=2,
+        signature_type=SignatureType.SECP256K1,
+        token_name="ETH",
+        chain_name=ChainName.Sepolia,
+        amount_mantissa=1,
+        amount_exponent=0,
+        destination_wallet=b"\x01\x02\x03",  # invalid length for EVM
+        time=1234567890000,
+        user_id=1,
+        signature_hex=dummy_signature_hex,
+    )
+
+    # When
+    message_str = str(withdraw_message)
+
+    # Then
+    assert "to: <invalid:0x010203>" in message_str
