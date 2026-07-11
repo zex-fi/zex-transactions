@@ -19,6 +19,8 @@ class OrderMessage(BaseMessage):
     _HEADER_FORMAT: str = ">BBBBB"
     _HEADER_FORMAT_SIZE: int = calcsize(">BBBBB")
 
+    # NOTE: If you add new attributes here, you MUST also set them in from_bytes().
+    # from_bytes() bypasses __init__ for performance and sets attributes directly.
     def __init__(
         self,
         version: int,
@@ -181,7 +183,9 @@ class OrderMessage(BaseMessage):
         except ValueError as e:
             raise MessageFormatError(f"Invalid signature type: {e}") from e
 
-        # Bypass __init__ validation — data from struct unpack is already valid
+        # Performance: bypass __init__ to skip redundant validation (version check,
+        # signature hex round-trip, exponent range check) — all already verified above
+        # or guaranteed by struct.unpack. If you add attributes to __init__, add them here too.
         order_message = object.__new__(cls)
         order_message.version = version
         order_message.signature_type = sig_type

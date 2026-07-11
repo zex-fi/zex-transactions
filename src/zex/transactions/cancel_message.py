@@ -36,6 +36,8 @@ class CancelMessage(BaseMessage):
     _HEADER_FORMAT: str = ">BBB"
     _HEADER_FORMAT_SIZE: int = calcsize(">BBB")
 
+    # NOTE: If you add new attributes here, you MUST also set them in from_bytes().
+    # from_bytes() bypasses __init__ for performance and sets attributes directly.
     def __init__(
         self,
         version: int,
@@ -148,7 +150,9 @@ class CancelMessage(BaseMessage):
         except ValueError as e:
             raise MessageFormatError(f"Invalid signature type: {e}") from e
 
-        # Bypass __init__ validation — data from struct unpack is already valid
+        # Performance: bypass __init__ to skip redundant validation (version check,
+        # signature hex round-trip) — all already verified above or guaranteed by
+        # struct.unpack. If you add attributes to __init__, add them here too.
         cancel_message = object.__new__(cls)
         cancel_message.version = version
         cancel_message.signature_type = sig_type
