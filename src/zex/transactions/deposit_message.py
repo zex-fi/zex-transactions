@@ -119,7 +119,7 @@ class DepositMessage(BaseMessage):
                 transaction_bytes[index : index + single_deposit_part1_length],
             )
 
-            single_deposit_part2_format = cls.get_body_format_part2(salt_length)
+            single_deposit_part2_format = cls.get_body_format_part2(salt_length, version)
             single_deposit_part2_length = calcsize(single_deposit_part2_format)
             salt_bytes, vout = unpack(
                 single_deposit_part2_format,
@@ -174,6 +174,7 @@ class DepositMessage(BaseMessage):
         transaction_hash_length: int,
         token_contrant_length: int,
         salt_lengths: list[int],
+        version: int = 2,
     ) -> str:
         result = ">"
         body_format_part1 = cls.get_body_format_part1(
@@ -181,7 +182,7 @@ class DepositMessage(BaseMessage):
             token_contract_length=token_contrant_length,
         )
         for salt_length in salt_lengths:
-            body_format_part2 = cls.get_body_format_part2(salt_length)
+            body_format_part2 = cls.get_body_format_part2(salt_length, version)
             result += body_format_part1[1:] + body_format_part2[1:]
         return result
 
@@ -198,8 +199,11 @@ class DepositMessage(BaseMessage):
         )
 
     @classmethod
-    def get_body_format_part2(cls, salt_length: int) -> str:
-        return f">{salt_length}s B"
+    def get_body_format_part2(cls, salt_length: int, version: int = 2) -> str:
+        # v2: salt | vout(B, 1 byte)
+        # v3: salt | vout(I, 4 bytes)
+        vout_fmt = "I" if version == 3 else "B"
+        return f">{salt_length}s {vout_fmt}"
 
     @classmethod
     def get_signature_format(cls) -> str:
@@ -211,6 +215,7 @@ class DepositMessage(BaseMessage):
         transaction_hash_length: int,
         token_contranct_length: int,
         salt_lengths: list[int],
+        version: int = 2,
     ) -> str:
         return (
             cls.get_header_format()
@@ -218,6 +223,7 @@ class DepositMessage(BaseMessage):
                 transaction_hash_length,
                 token_contranct_length,
                 salt_lengths,
+                version,
             )[1:]
         )
 
@@ -227,12 +233,14 @@ class DepositMessage(BaseMessage):
         transaction_hash_length: int,
         token_contranct_length: int,
         salt_lengths: list[int],
+        version: int = 2,
     ) -> str:
         return (
             cls.get_message_format(
                 transaction_hash_length,
                 token_contranct_length,
                 salt_lengths,
+                version,
             )
             + cls.get_signature_format()[1:]
         )
@@ -257,6 +265,7 @@ class DepositMessage(BaseMessage):
                 self.transaction_hash_length,
                 self.token_contract_length,
                 salt_lengths=[deposit.salt_length for deposit in self.deposits],
+                version=self.version,
             ),
             *self._get_message_arguments(),
         )
