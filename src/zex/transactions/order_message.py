@@ -1,4 +1,5 @@
 from decimal import Decimal
+from functools import lru_cache
 from struct import calcsize, pack, unpack
 from struct import error as struct_error
 
@@ -15,7 +16,11 @@ from zex.utils.zex_types import SignatureType, TransactionType
 
 class OrderMessage(BaseMessage):
     HEADER_LENGTH = 5
+    _HEADER_FORMAT: str = ">BBBBB"
+    _HEADER_FORMAT_SIZE: int = calcsize(">BBBBB")
 
+    # NOTE: If you add new attributes here, you MUST also set them in from_bytes().
+    # from_bytes() bypasses __init__ for performance and sets attributes directly.
     def __init__(
         self,
         version: int,
@@ -82,10 +87,11 @@ class OrderMessage(BaseMessage):
 
     @classmethod
     def get_header_format(cls) -> str:
-        return ">BBBBB"
+        return cls._HEADER_FORMAT
 
     @classmethod
-    def get_body_format(
+    @lru_cache(maxsize=32)
+    def get_body_format(  # pyright: ignore[reportIncompatibleMethodOverride]
         cls,
         base_token_length: int,
         quote_token_length: int,
@@ -106,31 +112,24 @@ class OrderMessage(BaseMessage):
         version: int = 2,
     ) -> str:
         return (
-            cls.get_header_format()
+            cls._HEADER_FORMAT
             + cls.get_body_format(base_token_length, quote_token_length, version)[1:]
         )
 
     @classmethod
     def from_bytes(cls, transaction_bytes: bytes) -> "OrderMessage":
-        if len(transaction_bytes) < cls.HEADER_LENGTH:
-            raise HeaderFormatError("Transaction is too short for header.")
-
-        msg_version = transaction_bytes[0]
-        header_format = cls.get_header_format()
-        header_length = calcsize(header_format)
-
+        header_length = cls._HEADER_FORMAT_SIZE
         if len(transaction_bytes) < header_length:
             raise HeaderFormatError("Transaction is too short for header.")
-        header_bytes = transaction_bytes[:header_length]
 
         try:
             version, command, signature_type, base_token_length, quote_token_length = unpack(
-                header_format, header_bytes
+                cls._HEADER_FORMAT, transaction_bytes[:header_length]
             )
         except struct_error as e:
             raise HeaderFormatError(f"Failed to unpack header: {e}") from e
 
-        if msg_version not in (2, 3):
+        if version not in (2, 3):
             raise MessageFormatError("Unsupported version.")
 
         if command != cls.TRANSACTION_TYPE.value:
@@ -140,13 +139,13 @@ class OrderMessage(BaseMessage):
         if quote_token_length == 0:
             raise MessageFormatError("Invalid quote token length.")
 
-        body_format = cls.get_body_format(base_token_length, quote_token_length, msg_version)
+        body_format = cls.get_body_format(base_token_length, quote_token_length, version)
         body_size = calcsize(body_format)
         if len(transaction_bytes) - header_length < body_size:
             raise MessageFormatError("Transaction body is too short.")
         body_bytes = transaction_bytes[header_length : header_length + body_size]
 
-        if msg_version == 2:
+        if version == 2:
             try:
                 (
                     base_token_bytes,
@@ -184,20 +183,22 @@ class OrderMessage(BaseMessage):
         except ValueError as e:
             raise MessageFormatError(f"Invalid signature type: {e}") from e
 
-        order_message = cls(
-            version=version,
-            signature_type=sig_type,
-            base_token=base_token_bytes.decode("ascii"),
-            quote_token=quote_token_bytes.decode("ascii"),
-            amount_mantissa=amount_mantissa,
-            amount_exponent=amount_exponent,
-            price_mantissa=price_mantissa,
-            price_exponent=price_exponent,
-            time=time,
-            user_id=user_id,
-            key_identifier=key_identifier,
-            signature_hex=signature_bytes.hex(),
-        )
+        # Performance: bypass __init__ to skip redundant validation (version check,
+        # signature hex round-trip, exponent range check) — all already verified above
+        # or guaranteed by struct.unpack. If you add attributes to __init__, add them here too.
+        order_message = object.__new__(cls)
+        order_message.version = version
+        order_message.signature_type = sig_type
+        order_message.signature_hex = signature_bytes.hex()
+        order_message.base_token = base_token_bytes.decode("ascii")
+        order_message.quote_token = quote_token_bytes.decode("ascii")
+        order_message.amount_mantissa = amount_mantissa
+        order_message.amount_exponent = amount_exponent
+        order_message.price_mantissa = price_mantissa
+        order_message.price_exponent = price_exponent
+        order_message.time = time
+        order_message._key_identifier = key_identifier
+        order_message.user_id = user_id
         order_message._transaction_bytes = transaction_bytes
         return order_message
 

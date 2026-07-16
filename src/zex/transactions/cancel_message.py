@@ -1,3 +1,4 @@
+from functools import lru_cache
 from struct import calcsize, pack, unpack
 from struct import error as struct_error
 
@@ -32,7 +33,11 @@ class CancelSchema(BaseModel):
 class CancelMessage(BaseMessage):
     TRANSACTION_TYPE = TransactionType.CANCEL
     HEADER_LENGTH = 3
+    _HEADER_FORMAT: str = ">BBB"
+    _HEADER_FORMAT_SIZE: int = calcsize(">BBB")
 
+    # NOTE: If you add new attributes here, you MUST also set them in from_bytes().
+    # from_bytes() bypasses __init__ for performance and sets attributes directly.
     def __init__(
         self,
         version: int,
@@ -85,10 +90,11 @@ class CancelMessage(BaseMessage):
 
     @classmethod
     def get_header_format(cls) -> str:
-        return ">BBB"
+        return cls._HEADER_FORMAT
 
     @classmethod
-    def get_body_format(cls, version: int = 2) -> str:
+    @lru_cache(maxsize=8)
+    def get_body_format(cls, version: int = 2) -> str:  # pyright: ignore[reportIncompatibleMethodOverride]
         # v2: user_id(Q) | order_nonce(Q) | sig
         # v3: user_id(Q) | order_timestamp(Q) | key_identifier(Q) | sig
         if version == 3:
@@ -97,19 +103,18 @@ class CancelMessage(BaseMessage):
 
     @classmethod
     def get_format(cls, version: int = 2) -> str:
-        return cls.get_header_format() + cls.get_body_format(version)[1:]
+        return cls._HEADER_FORMAT + cls.get_body_format(version)[1:]
 
     @classmethod
     def from_bytes(cls, transaction_bytes: bytes) -> "CancelMessage":
-        if len(transaction_bytes) < cls.HEADER_LENGTH:
+        header_length = cls._HEADER_FORMAT_SIZE
+        if len(transaction_bytes) < header_length:
             raise HeaderFormatError("Transaction is too short for header.")
 
-        header_format = cls.get_header_format()
-        header_length = calcsize(header_format)
-        header_bytes = transaction_bytes[:header_length]
-
         try:
-            version, command, signature_type = unpack(header_format, header_bytes)
+            version, command, signature_type = unpack(
+                cls._HEADER_FORMAT, transaction_bytes[:header_length]
+            )
         except struct_error as e:
             raise HeaderFormatError(f"Failed to unpack header: {e}") from e
 
@@ -145,15 +150,17 @@ class CancelMessage(BaseMessage):
         except ValueError as e:
             raise MessageFormatError(f"Invalid signature type: {e}") from e
 
-        cancel_message = cls(
-            version=version,
-            signature_type=sig_type,
-            order_nonce=order_nonce,
-            user_id=user_id,
-            order_timestamp=order_timestamp,
-            key_identifier=key_identifier,
-            signature_hex=signature_bytes.hex(),
-        )
+        # Performance: bypass __init__ to skip redundant validation (version check,
+        # signature hex round-trip) — all already verified above or guaranteed by
+        # struct.unpack. If you add attributes to __init__, add them here too.
+        cancel_message = object.__new__(cls)
+        cancel_message.version = version
+        cancel_message.signature_type = sig_type
+        cancel_message.signature_hex = signature_bytes.hex()
+        cancel_message._order_nonce = order_nonce
+        cancel_message._order_timestamp = order_timestamp
+        cancel_message._key_identifier = key_identifier
+        cancel_message.user_id = user_id
         cancel_message._transaction_bytes = transaction_bytes
         return cancel_message
 

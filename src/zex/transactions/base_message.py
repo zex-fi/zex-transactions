@@ -21,6 +21,7 @@ class BaseMessage(ABC):
     ADDITIONAL_EXPONENT: ClassVar[int] = 18
     SIGNATURE_LENGTH: ClassVar[int] = 64
     TRANSACTION_TYPE_FORMAT = ">xB"
+    _TRANSACTION_TYPE_FORMAT_SIZE: ClassVar[int] = calcsize(">xB")
     _TRANSACTION_TYPE_MAP: ClassVar[dict[int, type["BaseMessage"]] | None] = None
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -75,7 +76,7 @@ class BaseMessage(ABC):
         try:
             (transaction_type_value,) = unpack(
                 cls.TRANSACTION_TYPE_FORMAT,
-                transaction_bytes[: calcsize(cls.TRANSACTION_TYPE_FORMAT)],
+                transaction_bytes[: cls._TRANSACTION_TYPE_FORMAT_SIZE],
             )
         except struct_error as e:
             raise MessageFormatError(
@@ -137,9 +138,10 @@ class BaseMessage(ABC):
     def validate_signature(self, signature_hex: str | None) -> None:
         if signature_hex is None:
             return
+        if len(signature_hex) != self.SIGNATURE_LENGTH * 2:
+            raise MessageValidationError("The length of the provided signature is not valid.")
         try:
-            if len(bytes.fromhex(signature_hex)) != self.SIGNATURE_LENGTH:
-                raise MessageValidationError("The length of the provided signature is not valid.")
+            bytes.fromhex(signature_hex)
         except ValueError as e:
             raise MessageFormatError(
                 "The provided signature is not a valid hexadecimal number."
